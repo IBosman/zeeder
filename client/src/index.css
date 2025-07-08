@@ -76,7 +76,7 @@
   --muted-foreground: var(--dark-text-secondary);
   --popover: var(--dark-primary);
   --popover-foreground: var(--dark-text);
-  --card: var(--dark-secondary);
+  --card: var(--dark-primary);
   --card-foreground: var(--dark-text);
   --border: var(--dark-border);
   --input: var(--dark-tertiary);

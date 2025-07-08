@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, ChevronDown } from "lucide-react";
 import { Agent } from "@shared/schema";
+import { Link } from "wouter";
 
 interface AgentsTableProps {
   searchQuery: string;
@@ -66,7 +67,9 @@ export default function AgentsTable({ searchQuery }: AgentsTableProps) {
           {filteredAgents.map((agent) => (
             <TableRow key={agent.id} className="hover:bg-muted/50 transition-colors border-b border-border">
               <TableCell className="px-6 py-4 text-sm font-medium text-foreground">
-                {agent.name}
+                <Link href={`/agent/${agent.id}`} className="hover:text-primary cursor-pointer">
+                  {agent.name}
+                </Link>
               </TableCell>
               <TableCell className="px-6 py-4 text-sm text-muted-foreground">
                 {agent.createdBy}

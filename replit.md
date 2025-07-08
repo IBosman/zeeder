@@ -96,3 +96,4 @@ Preferred communication style: Simple, everyday language.
 
 Changelog:
 - July 04, 2025. Initial setup
+- July 08, 2025. Added agent details page with comprehensive configuration interface including first message, system prompt, knowledge base, RAG settings, and tools configuration
