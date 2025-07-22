@@ -1,17 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, ExternalLink, X } from "lucide-react";
+import { Search, Plus, ExternalLink, X, MoreHorizontal } from "lucide-react";
 import Sidebar from "@/components/sidebar";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useLocation } from "wouter";
+import AgentsTableUI, { Agent } from "./agents-table-ui";
 import UserAgentsTable from "@/components/user-agents-table";
+import AdminAgentsTable from "@/components/admin-agents-table";
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('role') !== 'admin') {
+      setLocation('/login');
+    }
+  }, [setLocation]);
 
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-      
       <main className="flex-1 flex flex-col">
         {/* Page Header */}
         <header className="px-8 py-6 border-b border-border">
@@ -22,7 +31,6 @@ export default function Dashboard() {
             </div>
           </div>
         </header>
-
         {/* Content Area */}
         <div className="flex-1 px-8 py-6">
           {/* Search Bar */}
@@ -38,12 +46,10 @@ export default function Dashboard() {
               />
             </div>
           </div>
-
           {/* Agents Table */}
-          <UserAgentsTable searchQuery={searchQuery} />
+          <AdminAgentsTable searchQuery={searchQuery} />
         </div>
       </main>
-
     </div>
   );
 }

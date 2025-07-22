@@ -1,31 +1,41 @@
-import { pgTable, text, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+// shared/schema.mysql.ts
+import { 
+  mysqlTable, 
+  serial, 
+  varchar, 
+  int, 
+  timestamp  // Add this import
+} from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
+export const users = mysqlTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  role: varchar("role", { length: 50 }).notNull().default('user'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").onUpdateNow(),
 });
 
-export const agents = pgTable("agents", {
+export const agents = mysqlTable("agents", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  createdBy: text("created_by").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdBy: varchar("created_by", { length: 255 }).notNull(),
+  userId: int("user_id").notNull(),
+  elevenlabsAgentId: varchar("elevenlabs_agent_id", { length: 255 }).notNull().unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").onUpdateNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-});
+// Foreign key relationship
+// Note: In MySQL, you'll need to add these as table options or use migrations
 
-export const insertAgentSchema = createInsertSchema(agents).pick({
-  name: true,
-  createdBy: true,
-});
+export const insertUserSchema = createInsertSchema(users);
+
+export const insertAgentSchema = createInsertSchema(agents);
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertAgent = z.infer<typeof insertAgentSchema>;
-export type Agent = typeof agents.$inferSelect;
+export type Agent = Omit<typeof agents.$inferSelect, 'createdBy'> & { createdBy?: string };

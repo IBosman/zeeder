@@ -1,16 +1,25 @@
 import { Home, Users, CreditCard, Settings, ArrowLeft, Headphones, Bell, ChevronDown, User, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocation } from "wouter";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 export default function Sidebar() {
+  const [location, navigate] = useLocation();
+  const isAdmin = typeof window !== 'undefined' && localStorage.getItem('role') === 'admin';
   return (
     <aside className="w-60 bg-card flex flex-col border-r border-border">
       {/* Logo/Brand Section */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Bot className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold">AI Studio</span>
+          <img 
+            src="/zeeder-ai-logo.png" 
+            alt="Zeeder AI Logo" 
+            className="h-8 w-auto object-contain"
+            onError={(e) => {
+              // Fallback in case the image fails to load
+              console.error('Failed to load logo:', e);
+            }}
+          />
         </div>
       </div>
 
@@ -18,25 +27,55 @@ export default function Sidebar() {
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
           <li>
-            <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted">
-              <Home className="h-4 w-4 mr-3" />
-              <span className="text-sm">Home</span>
-            </Button>
-          </li>
-          <li>
-            <Button variant="secondary" className="w-full justify-start bg-muted text-foreground">
+            <Button
+              variant={
+                isAdmin
+                  ? location === "/admin/agents" ? "secondary" : "ghost"
+                  : location === "/" ? "secondary" : "ghost"
+              }
+              className={
+                isAdmin
+                  ? `w-full justify-start ${location === "/admin/agents" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
+                  : `w-full justify-start ${location === "/" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
+              }
+              onClick={() => navigate(isAdmin ? "/admin/agents" : "/")}
+            >
               <Users className="h-4 w-4 mr-3" />
               <span className="text-sm font-medium">Agents</span>
             </Button>
           </li>
+          {isAdmin && (
+            <li>
+              <Button
+                variant={location === "/admin/users" ? "secondary" : "ghost"}
+                className={
+                  `w-full justify-start ${location === "/admin/users" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
+                }
+                onClick={() => navigate("/admin/users")}
+              >
+                <User className="h-4 w-4 mr-3" />
+                <span className="text-sm font-medium">Users</span>
+              </Button>
+            </li>
+          )}
           <li>
-            <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted">
+            <Button
+              variant={location === "/billing" ? "secondary" : "ghost"}
+              className={
+                `w-full justify-start ${location === "/billing" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
+              }
+              onClick={() => navigate("/billing")}
+            >
               <CreditCard className="h-4 w-4 mr-3" />
               <span className="text-sm">Billing</span>
             </Button>
           </li>
           <li>
-            <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-muted">
+            <Button
+              variant={location === "/settings" ? "secondary" : "ghost"}
+              className={`w-full justify-start ${location === "/settings" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              onClick={() => navigate("/settings")}
+            >
               <Settings className="h-4 w-4 mr-3" />
               <span className="text-sm">Settings</span>
             </Button>
@@ -46,18 +85,7 @@ export default function Sidebar() {
 
       {/* Bottom Section */}
       <div className="p-4 border-t border-border">
-        <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground mb-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          <span className="text-sm">Back to ElevenLabs</span>
-        </Button>
         <div className="space-y-2">
-          <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground">
-            <div className="flex items-center space-x-2">
-              <Headphones className="h-4 w-4" />
-              <span className="text-sm">Audio Tools</span>
-            </div>
-            <ChevronDown className="h-4 w-4" />
-          </Button>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground">
             <Bell className="h-4 w-4 mr-2" />
             <span className="text-sm">Notifications</span>
@@ -67,6 +95,8 @@ export default function Sidebar() {
 
       {/* Account Section */}
       <div className="p-4 border-t border-border">
+        <Popover>
+          <PopoverTrigger asChild>
         <Button variant="ghost" className="w-full justify-between p-0 h-auto">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
@@ -79,6 +109,13 @@ export default function Sidebar() {
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="p-0 w-56">
+            <div className="py-2">
+              <Button variant="ghost" className="w-full justify-start px-4 py-2 text-sm text-red-600" onClick={() => { localStorage.clear(); navigate("/login"); }}>Sign out</Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </aside>
   );
