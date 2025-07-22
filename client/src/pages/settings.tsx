@@ -29,12 +29,12 @@ export default function Settings() {
                       <div>
                         <Label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">Name</Label>
                         <div className="text-xs text-muted-foreground mb-1">The name associated with this account</div>
-                        <Input id="name" defaultValue="Imraan Bosman" />
+                        <Input id="name" defaultValue="Dona" />
                       </div>
                       <div>
                         <Label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">Email address</Label>
                         <div className="text-xs text-muted-foreground mb-1">The email address associated with this account</div>
-                        <Input id="email" defaultValue="imraanbosman2@proton.me" disabled />
+                        <Input id="email" defaultValue="dona@zillion.co.za" disabled />
                       </div>
                       <div>
                         <Label htmlFor="phone" className="block text-sm font-medium text-foreground mb-1">Phone number</Label>
