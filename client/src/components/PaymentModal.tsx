@@ -94,7 +94,7 @@ export function PaymentModal({ isOpen, onClose, creditAmount, price, pricePerCre
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">${pricePerCredit.toFixed(2)} × {creditAmount.toLocaleString()} credits</span>
-                  <span className="font-medium">${(pricePerCredit * creditAmount).toFixed(2)}</span>
+                  <span className="font-medium">${price.toFixed(2)}</span>
                 </div>
                 
                 <div className="flex justify-between items-center pt-2 border-t">
@@ -104,14 +104,14 @@ export function PaymentModal({ isOpen, onClose, creditAmount, price, pricePerCre
                 
                 <div className="flex justify-between items-center pt-2 border-t font-medium">
                   <span>Total</span>
-                  <span>${(pricePerCredit * creditAmount).toFixed(2)}</span>
+                  <span>${price.toFixed(2)}</span>
                 </div>
               </div>
             </CardComponent>
             
             <div className="pt-2">
               <Button className="w-full" size="lg">
-                Pay ${(pricePerCredit * creditAmount).toFixed(2)}
+                Pay ${price.toFixed(2)}
               </Button>
               <p className="text-xs text-muted-foreground mt-2 text-center">
                 Your payment is secure and encrypted

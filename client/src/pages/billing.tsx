@@ -72,7 +72,7 @@ export default function Billing() {
                         <Button 
                           size="sm" 
                           className="h-8"
-                          onClick={() => openPaymentModal(500, 45.00, 0.09)}
+                          onClick={() => openPaymentModal(100, 10.00, 0.10)}
                         >
                           Buy now
                         </Button>
@@ -116,7 +116,7 @@ export default function Billing() {
                         <Button 
                           size="sm" 
                           className="h-8"
-                          onClick={() => openPaymentModal(500, 45.00, 0.09)}
+                          onClick={() => openPaymentModal(1000, 80.00, 0.08)}
                         >
                           Buy now
                         </Button>
@@ -138,7 +138,7 @@ export default function Billing() {
                         <Button 
                           size="sm" 
                           className="h-8"
-                          onClick={() => openPaymentModal(500, 45.00, 0.09)}
+                          onClick={() => openPaymentModal(2500, 175.00, 0.07)}
                         >
                           Buy now
                         </Button>
@@ -161,7 +161,7 @@ export default function Billing() {
                         <Button 
                           size="sm" 
                           className="h-8"
-                          onClick={() => openPaymentModal(500, 45.00, 0.09)}
+                          onClick={() => openPaymentModal(5000, 300.00, 0.06)}
                         >
                           Buy now
                         </Button>
@@ -183,7 +183,7 @@ export default function Billing() {
                         <Button 
                           size="sm" 
                           className="h-8"
-                          onClick={() => openPaymentModal(500, 45.00, 0.09)}
+                          onClick={() => openPaymentModal(10000, 500.00, 0.05)}
                         >
                           Buy now
                         </Button>
@@ -205,7 +205,7 @@ export default function Billing() {
                         <Button 
                           size="sm" 
                           className="h-8"
-                          onClick={() => openPaymentModal(500, 45.00, 0.09)}
+                          onClick={() => openPaymentModal(25000, 1000.00, 0.04)}
                         >
                           Buy now
                         </Button>
@@ -227,7 +227,7 @@ export default function Billing() {
                         <Button 
                           size="sm" 
                           className="h-8"
-                          onClick={() => openPaymentModal(500, 45.00, 0.09)}
+                          onClick={() => openPaymentModal(50000, 1500.00, 0.03)}
                         >
                           Buy now
                         </Button>
