@@ -28,17 +28,27 @@ export default function Sidebar() {
         <ul className="space-y-2">
           <li>
             <Button
+              variant={location === "/" || location === "/dashboard" ? "secondary" : "ghost"}
+              className={`w-full justify-start ${location === "/" || location === "/dashboard" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              onClick={() => navigate("/")}
+            >
+              <Home className="h-4 w-4 mr-3" />
+              <span className="text-sm font-medium">Dashboard</span>
+            </Button>
+          </li>
+          <li>
+            <Button
               variant={
                 isAdmin
                   ? location === "/admin/agents" ? "secondary" : "ghost"
-                  : location === "/" ? "secondary" : "ghost"
+                  : location === "/agents" ? "secondary" : "ghost"
               }
               className={
                 isAdmin
                   ? `w-full justify-start ${location === "/admin/agents" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
-                  : `w-full justify-start ${location === "/" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
+                  : `w-full justify-start ${location === "/agents" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
               }
-              onClick={() => navigate(isAdmin ? "/admin/agents" : "/")}
+              onClick={() => navigate(isAdmin ? "/admin/agents" : "/agents")}
             >
               <Users className="h-4 w-4 mr-3" />
               <span className="text-sm font-medium">Agents</span>

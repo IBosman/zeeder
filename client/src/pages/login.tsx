@@ -32,6 +32,7 @@ export default function Login() {
       const data = await res.json();
       localStorage.setItem("token", data.token);
       localStorage.setItem("role", data.role);
+      localStorage.setItem("username", data.username || email);
       if (data.role === "admin") {
         setLocation("/admin");
       } else {

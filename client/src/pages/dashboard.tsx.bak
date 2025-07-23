@@ -1,0 +1,42 @@
+import Sidebar from "@/components/sidebar";
+import { useEffect, useState } from "react";
+
+export default function Dashboard() {
+  const [username, setUsername] = useState("");
+
+  useEffect(() => {
+    // Get username from localStorage when component mounts
+    const storedUsername = localStorage.getItem("username") || "";
+    setUsername(storedUsername);
+  }, []);
+  return (
+    <div className="flex h-screen bg-background">
+      <Sidebar />
+      
+      <main className="flex-1 flex flex-col">
+        {/* Page Header */}
+        <header className="px-8 py-6 border-b border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground">
+                Hi {username ? username : "there"}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">Overview of your account and activities</p>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="flex-1 px-8 py-6 overflow-auto">
+          <div className="flex justify-center items-center h-full">
+            <img 
+              src="/images/dashboard.png" 
+              alt="Dashboard Overview" 
+              className="max-w-full h-auto max-h-[80vh] object-contain rounded-lg shadow-lg"
+            />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
