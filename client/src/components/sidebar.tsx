@@ -21,23 +21,18 @@ export default function Sidebar({ isOpen: isOpenProp, onClose }: SidebarProps) {
     const checkIfMobile = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      
-      // Only update internal state if not controlled
-      if (isOpenProp === undefined) {
-        setInternalIsOpen(!mobile);
-      }
     };
     
     checkIfMobile();
     window.addEventListener('resize', checkIfMobile);
     return () => window.removeEventListener('resize', checkIfMobile);
-  }, [isOpenProp]);
+  }, []);
   
   const toggleSidebar = () => {
     if (onClose) {
       onClose();
     } else {
-      setInternalIsOpen(!isOpen);
+      setInternalIsOpen(prev => !prev);
     }
   };
   const [location, navigate] = useLocation();

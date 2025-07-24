@@ -4,6 +4,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { PaymentModal } from "@/components/PaymentModal";
+import { AddPaymentMethodModal } from "@/components/AddPaymentMethodModal";
 import { useState } from "react";
 import { Dialog, DialogTrigger, DialogContent, DialogClose } from "@/components/ui/dialog";
 
@@ -22,6 +23,8 @@ export default function Billing() {
     price: 0,
     pricePerCredit: 0,
   });
+  
+  const [isAddPaymentMethodOpen, setIsAddPaymentMethodOpen] = useState(false);
 
   const openPaymentModal = (creditAmount: number, price: number, pricePerCredit: number) => {
     setSelectedPlan({
@@ -34,6 +37,12 @@ export default function Billing() {
 
   const closePaymentModal = () => {
     setSelectedPlan(prev => ({ ...prev, isOpen: false }));
+  };
+  
+  const handlePaymentMethodAdded = () => {
+    // Handle successful payment method addition
+    // You might want to refresh the payment methods list here
+    console.log('Payment method added successfully');
   };
   
   return (
@@ -257,58 +266,18 @@ export default function Billing() {
                     <Button variant="link" size="sm" className="text-destructive w-fit pl-0">Delete</Button>
                   </CardContent>
                 </Card>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="secondary" className="w-[250px]">Add payment method</Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-md w-full rounded-2xl">
-                    <div className="p-1">
-                      <h2 className="text-lg font-semibold mb-1">Add payment method</h2>
-                      <p className="text-sm text-muted-foreground mb-4">Add your credit card details below. This card will be saved to your account and can be removed at any time.</p>
-                      <div className="mb-2">
-                        <div className="text-xs font-medium mb-1">Card information</div>
-                        <div className="flex gap-2">
-                          <Input placeholder="Card number" className="flex-1" />
-                          <Input placeholder="MM / YY" className="w-20" />
-                          <Input placeholder="CVC" className="w-16" />
-                        </div>
-                      </div>
-                      <div className="mb-2">
-                        <div className="text-xs font-medium mb-1">Name on card</div>
-                        <Input placeholder="" />
-                      </div>
-                      <div className="mb-2">
-                        <div className="text-xs font-medium mb-1">Billing address</div>
-                        <select className="w-full mb-2 rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm text-foreground">
-                          <option value="">Country</option>
-                          <option value="US">United States</option>
-                          <option value="GB">United Kingdom</option>
-                          <option value="ZA">South Africa</option>
-                          <option value="IN">India</option>
-                          <option value="CA">Canada</option>
-                          <option value="AU">Australia</option>
-                        </select>
-                        <Input placeholder="Address line 1" className="mb-2" />
-                        <Input placeholder="Address line 2" className="mb-2" />
-                        <div className="flex flex-col sm:flex-row gap-2 mb-2">
-                          <Input placeholder="City" className="flex-1 mb-2 sm:mb-0" />
-                          <Input placeholder="Postal code" className="flex-1" />
-                        </div>
-                        <Input placeholder="State, county, province, or region" />
-                      </div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <input type="checkbox" id="default" className="accent-primary h-4 w-4 rounded" />
-                        <label htmlFor="default" className="text-sm">Set as default payment method</label>
-                      </div>
-                      <div className="flex justify-end gap-2 mt-6">
-                        <DialogClose asChild>
-                          <Button variant="secondary">Cancel</Button>
-                        </DialogClose>
-                        <Button type="submit">Add payment method</Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                <Button 
+                  variant="secondary" 
+                  className="w-[250px]"
+                  onClick={() => setIsAddPaymentMethodOpen(true)}
+                >
+                  Add payment method
+                </Button>
+                <AddPaymentMethodModal 
+                  isOpen={isAddPaymentMethodOpen}
+                  onClose={() => setIsAddPaymentMethodOpen(false)}
+                  onPaymentMethodAdded={handlePaymentMethodAdded}
+                />
               </div>
             </TabsContent>
             <TabsContent value="history">
