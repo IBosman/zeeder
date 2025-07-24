@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Copy, MoreHorizontal, Bot, ChevronLeft, FileText, Trash2 } from "lucide-react";
 import { Link } from "wouter";
-import Sidebar from "@/components/sidebar";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
@@ -366,9 +365,7 @@ export default function AgentDetails() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      
+    <div className="flex-1 flex flex-col overflow-hidden">
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="px-8 py-6 border-b border-border">
