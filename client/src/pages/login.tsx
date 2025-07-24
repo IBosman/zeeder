@@ -49,7 +49,7 @@ export default function Login() {
         <img 
           src="/zeeder-ai-logo.png" 
           alt="Zeeder AI Logo" 
-          className="h-12 w-auto object-contain"
+          className="h-6 w-auto object-contain"
           onError={(e) => {
             console.error('Failed to load logo:', e);
           }}

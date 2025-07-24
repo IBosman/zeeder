@@ -1,3 +1,4 @@
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +17,25 @@ interface PaymentModalProps {
 export function PaymentModal({ isOpen, onClose, creditAmount, price, pricePerCredit }: PaymentModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[800px] max-w-[95vw]">
-        <DialogHeader className="border-b pb-4">
+      <DialogContent className="w-full max-w-[95vw] sm:max-w-[90vw] md:max-w-[800px] max-h-[90vh] overflow-y-auto p-0 [&>button]:hidden">
+        <DialogHeader className="border-b p-6 pb-4 relative">
           <DialogTitle>Complete Payment</DialogTitle>
+          <DialogPrimitive.Close asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute right-4 top-4 h-8 w-8 p-0 rounded-full"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </DialogPrimitive.Close>
         </DialogHeader>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 px-1">
           {/* Left Column - Payment Form */}
-          <div className="space-y-4">
+          <div className="space-y-4 px-2">
             <h3 className="font-medium">Payment Method</h3>
             
             <div className="space-y-2">
@@ -31,9 +43,9 @@ export function PaymentModal({ isOpen, onClose, creditAmount, price, pricePerCre
               <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="expiry">Expiry Date</Label>
+                <Label htmlFor="expiry">Expiry</Label>
                 <Input id="expiry" placeholder="MM/YY" />
               </div>
               <div className="space-y-2">
@@ -87,7 +99,7 @@ export function PaymentModal({ isOpen, onClose, creditAmount, price, pricePerCre
           </div>
           
           {/* Right Column - Order Summary */}
-          <div className="space-y-4">
+          <div className="space-y-4 px-2">
             <h3 className="font-medium">Order Summary</h3>
             
             <CardComponent className="p-6">
@@ -118,8 +130,8 @@ export function PaymentModal({ isOpen, onClose, creditAmount, price, pricePerCre
               </p>
             </div>
             
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <CreditCard className="h-4 w-4" />
+            <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-muted-foreground text-center">
+              <CreditCard className="h-4 w-4 flex-shrink-0" />
               <span>We accept all major credit cards</span>
             </div>
           </div>

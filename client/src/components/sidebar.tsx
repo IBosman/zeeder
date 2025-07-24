@@ -2,19 +2,69 @@ import { Home, Users, CreditCard, Settings, ArrowLeft, Headphones, Bell, Chevron
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { useState, useEffect } from "react";
 
-export default function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen: isOpenProp, onClose }: SidebarProps) {
+  const [isMobile, setIsMobile] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  
+  // Use controlled isOpen prop if provided, otherwise use internal state
+  const isOpen = isOpenProp !== undefined ? isOpenProp : internalIsOpen;
+  
+  // Check if mobile on mount and on window resize
+  useEffect(() => {
+    const checkIfMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      
+      // Only update internal state if not controlled
+      if (isOpenProp === undefined) {
+        setInternalIsOpen(!mobile);
+      }
+    };
+    
+    checkIfMobile();
+    window.addEventListener('resize', checkIfMobile);
+    return () => window.removeEventListener('resize', checkIfMobile);
+  }, [isOpenProp]);
+  
+  const toggleSidebar = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      setInternalIsOpen(!isOpen);
+    }
+  };
   const [location, navigate] = useLocation();
   const isAdmin = typeof window !== 'undefined' && localStorage.getItem('role') === 'admin';
   return (
-    <aside className="w-60 bg-card flex flex-col border-r border-border">
-      {/* Logo/Brand Section */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center space-x-2">
+    <>
+      {/* Overlay */}
+      {isOpen && isMobile && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
+      
+      <aside 
+        className={`fixed md:static inset-y-0 left-0 z-40 w-60 bg-card flex flex-col border-r border-border transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        <div className="flex-1 flex flex-col overflow-y-auto">
+      {/* Logo/Brand Section - Hidden on mobile */}
+      <div className="hidden md:block p-4 border-b border-border">
+        <div className="flex items-center justify-center">
           <img 
             src="/zeeder-ai-logo.png" 
             alt="Zeeder AI Logo" 
-            className="h-8 w-auto object-contain"
+            className="h-6 w-auto object-contain"
             onError={(e) => {
               // Fallback in case the image fails to load
               console.error('Failed to load logo:', e);
@@ -126,7 +176,9 @@ export default function Sidebar() {
             </div>
           </PopoverContent>
         </Popover>
-      </div>
-    </aside>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

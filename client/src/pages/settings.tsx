@@ -9,13 +9,11 @@ import { useState } from "react";
 export default function Settings() {
   const [tab, setTab] = useState("user");
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <div className="px-8 py-6 border-b border-border">
-          <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
-        </div>
-        <div className="flex-1 px-8 py-6 overflow-y-auto">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <header className="px-4 md:pl-8 md:pr-8 py-4 md:py-6 border-b border-border sticky top-0 z-30 bg-background">
+        <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+      </header>
+      <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <Tabs value={tab} onValueChange={setTab} className="w-full">
             <TabsList className="mb-6">
               <TabsTrigger value="user">User</TabsTrigger>
@@ -74,8 +72,7 @@ export default function Settings() {
               </div>
             </TabsContent>
           </Tabs>
-        </div>
-      </main>
+      </div>
     </div>
   );
 } 

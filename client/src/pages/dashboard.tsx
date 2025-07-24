@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Check, ChevronRight } from "lucide-react";
-import Sidebar from "@/components/sidebar";
 
 // Mock data for the charts
 const callsData = [
@@ -66,38 +65,35 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="px-8 py-6 border-b border-border">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-semibold text-foreground">Good afternoon {username ? username : "there"}</h1>
-            <div className="flex items-center space-x-3">
-              <Select value={agentFilter} onValueChange={setAgentFilter}>
-                <SelectTrigger className="w-[140px] bg-background border-border">
-                  <SelectValue placeholder="All agents" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all-agents">All agents</SelectItem>
-                  <SelectItem value="support-agent">Support agent</SelectItem>
-                  <SelectItem value="test-2">TEST 2</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={timeFilter} onValueChange={setTimeFilter}>
-                <SelectTrigger className="w-[140px] bg-background border-border">
-                  <SelectValue placeholder="Last month" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="last-month">Last month</SelectItem>
-                  <SelectItem value="last-week">Last week</SelectItem>
-                  <SelectItem value="last-7-days">Last 7 days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Header */}
+      <header className="px-4 md:pl-8 md:pr-8 py-4 md:py-6 border-b border-border sticky top-0 z-30 bg-background">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold text-foreground">Good afternoon {username ? username : "there"}</h1>
+          <div className="flex flex-wrap gap-2">
+            <Select value={agentFilter} onValueChange={setAgentFilter}>
+              <SelectTrigger className="w-[140px] bg-background border-border">
+                <SelectValue placeholder="All agents" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all-agents">All agents</SelectItem>
+                <SelectItem value="support-agent">Support agent</SelectItem>
+                <SelectItem value="test-2">TEST 2</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={timeFilter} onValueChange={setTimeFilter}>
+              <SelectTrigger className="w-[140px] bg-background border-border">
+                <SelectValue placeholder="Last month" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="last-month">Last month</SelectItem>
+                <SelectItem value="last-week">Last week</SelectItem>
+                <SelectItem value="last-7-days">Last 7 days</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </header>
+        </div>
+      </header>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-8 py-6">
@@ -275,7 +271,6 @@ export default function Dashboard() {
             </Card>
           </div>
         </div>
-      </main>
     </div>
   );
 }
