@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, ExternalLink, X, MoreHorizontal } from "lucide-react";
-import Sidebar from "@/components/sidebar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 import AgentsTableUI, { Agent } from "./agents-table-ui";
@@ -19,8 +18,7 @@ export default function Dashboard() {
   }, [setLocation]);
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
+    <div className="flex-1 flex flex-col">
       <main className="flex-1 flex flex-col">
         {/* Page Header */}
         <header className="px-8 py-6 border-b border-border">

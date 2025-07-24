@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, ExternalLink, X } from "lucide-react";
-import Sidebar from "@/components/sidebar";
 import UserAgentsTable from "@/components/user-agents-table";
 
 export default function Dashboard() {

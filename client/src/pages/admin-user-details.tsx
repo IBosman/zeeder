@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useRoute, useLocation, Link } from "wouter";
-import Sidebar from "@/components/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -131,8 +130,7 @@ export default function AdminUserDetailsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
+    <div className="flex-1 flex flex-col overflow-hidden">
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <header className="px-8 py-6 border-b border-border">

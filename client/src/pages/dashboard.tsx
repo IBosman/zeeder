@@ -57,6 +57,17 @@ export default function Dashboard() {
   const [agentFilter, setAgentFilter] = useState("all-agents");
   const [timeFilter, setTimeFilter] = useState("last-month");
   const [username, setUsername] = useState("");
+  const [windowWidth, setWindowWidth] = useState(0);
+  
+  useEffect(() => {
+    // Set initial width
+    setWindowWidth(window.innerWidth);
+    
+    // Update width on resize
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // Get username from localStorage when component mounts
@@ -101,7 +112,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             {/* Number of calls */}
             <Card className="bg-card border-border">
-              <CardContent className="p-6">
+              <CardContent className={`${windowWidth < 768 ? 'p-1' : 'p-6'}`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Number of calls</p>
@@ -116,7 +127,7 @@ export default function Dashboard() {
 
             {/* Average duration */}
             <Card className="bg-card border-border">
-              <CardContent className="p-6">
+              <CardContent className={`${windowWidth < 768 ? 'p-1' : 'p-6'}`}>
                 <p className="text-sm text-muted-foreground mb-1">Average duration</p>
                 <p className="text-3xl font-bold text-foreground">0:40</p>
               </CardContent>
@@ -124,7 +135,7 @@ export default function Dashboard() {
 
             {/* Total cost */}
             <Card className="bg-card border-border">
-              <CardContent className="p-6">
+              <CardContent className={`${windowWidth < 768 ? 'p-1' : 'p-6'}`}>
                 <p className="text-sm text-muted-foreground mb-1">Total cost</p>
                 <p className="text-3xl font-bold text-foreground">
                   10,307<span className="text-sm font-normal text-muted-foreground">credits</span>
@@ -134,7 +145,7 @@ export default function Dashboard() {
 
             {/* Average cost */}
             <Card className="bg-card border-border">
-              <CardContent className="p-6">
+              <CardContent className={`${windowWidth < 768 ? 'p-1' : 'p-6'}`}>
                 <p className="text-sm text-muted-foreground mb-1">Credits Remaining</p>
                 <p className="text-3xl font-bold text-foreground">
                   22,087<span className="text-sm font-normal text-muted-foreground">credits</span>
@@ -162,13 +173,13 @@ export default function Dashboard() {
           <div className="space-y-8">
             {/* Calls Chart */}
             <Card className="bg-card border-border">
-              <CardContent className="p-6">
-                <div className="h-80 w-full">
+              <CardContent className={`${windowWidth < 768 ? 'p-1' : 'p-6'}`}>
+                <div className={`w-full ${windowWidth < 768 ? 'h-[400px]' : 'h-80'}`}>
                   {callsData && callsData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart 
                         data={callsData} 
-                        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                        margin={windowWidth < 768 ? { top: 20, right: 10, left: 10, bottom: 40 } : { top: 20, right: 30, left: 20, bottom: 20 }}
                       >
                         <CartesianGrid 
                           strokeDasharray="none" 
@@ -181,7 +192,7 @@ export default function Dashboard() {
                           axisLine={false}
                           tickLine={false}
                           tick={{ fill: '#888', fontSize: 11 }}
-                          interval={0}
+                          interval={windowWidth < 768 ? 1 : 0}
                         />
                         <YAxis 
                           axisLine={false}
@@ -221,13 +232,13 @@ export default function Dashboard() {
                   Overall success rate
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="h-80 w-full">
+              <CardContent className={`${windowWidth < 768 ? 'p-1' : 'p-6'}`}>
+                <div className={`w-full ${windowWidth < 768 ? 'h-[400px]' : 'h-80'}`}>
                   {successRateData && successRateData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart 
                         data={successRateData}
-                        margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
+                        margin={windowWidth < 768 ? { top: 20, right: 10, left: 10, bottom: 40 } : { top: 20, right: 30, left: 40, bottom: 20 }}
                       >
                         <CartesianGrid 
                           strokeDasharray="none" 
@@ -240,7 +251,7 @@ export default function Dashboard() {
                           axisLine={false}
                           tickLine={false}
                           tick={{ fill: '#888', fontSize: 11 }}
-                          interval={0}
+                          interval={windowWidth < 768 ? 1 : 0}
                         />
                         <YAxis 
                           axisLine={false}

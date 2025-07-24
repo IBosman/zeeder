@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
-import Sidebar from "@/components/sidebar";
+import { Search, MoreHorizontal } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useLocation } from "wouter";
-import { Link } from "wouter";
-import { MoreHorizontal } from "lucide-react";
+import { useLocation, Link } from "wouter";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -86,8 +83,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
+    <div className="flex-1 flex flex-col">
       <main className="flex-1 flex flex-col">
         {/* Page Header */}
         <header className="px-8 py-6 border-b border-border">
