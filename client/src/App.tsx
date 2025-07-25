@@ -97,7 +97,7 @@ function App() {
               <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
             </>
           )}
-          <main className="flex-1 transition-all duration-300 pt-16 md:pt-0">
+          <main className={`flex-1 transition-all duration-300 pt-16 md:pt-0 ${showSidebar ? 'md:ml-60' : ''} min-h-screen overflow-auto`}>
             <Router />
           </main>
         </div>

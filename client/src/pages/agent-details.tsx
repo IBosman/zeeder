@@ -120,6 +120,13 @@ export default function AgentDetails() {
   const isAdmin = typeof window !== 'undefined' && localStorage.getItem('role') === 'admin';
   const [createdBy, setCreatedBy] = useState<string>("");
 
+  const [voices, setVoices] = useState<any[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(true);
+  const [savingVoice, setSavingVoice] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   // Fetch all users for assignment dropdown (admin only)
   useEffect(() => {
     if (!isAdmin) return;
@@ -139,6 +146,80 @@ export default function AgentDetails() {
       .catch(err => setUsersError(err.message || "Unknown error"))
       .finally(() => setUsersLoading(false));
   }, [isAdmin]);
+
+  // Fetch available voices
+  useEffect(() => {
+    const fetchVoices = async () => {
+      try {
+        setLoadingVoices(true);
+        const token = localStorage.getItem("token");
+        
+        // First check if the endpoint exists
+        const response = await fetch("/api/voices", {
+          method: 'HEAD',
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json"
+          }
+        });
+
+        // If endpoint doesn't exist, use a default voice
+        if (response.status === 404) {
+          console.log('Voices API endpoint not found, using default voice');
+          const defaultVoice = {
+            voice_id: 'default',
+            name: 'Default Voice',
+            preview_url: ''
+          };
+          setVoices([defaultVoice]);
+          setSelectedVoice(defaultVoice.voice_id);
+          return;
+        }
+
+        // If endpoint exists, fetch the actual data
+        const dataResponse = await fetch("/api/voices", {
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : "",
+            "Content-Type": "application/json"
+          }
+        });
+        
+        const responseText = await dataResponse.text();
+        
+        if (!dataResponse.ok) {
+          console.error('Error response text:', responseText);
+          // If we get HTML back, the endpoint might be misconfigured
+          if (responseText.trim().startsWith('<!DOCTYPE html>')) {
+            throw new Error('Voices API endpoint returned HTML instead of JSON. The endpoint might be misconfigured.');
+          }
+          throw new Error(`Failed to fetch voices (${dataResponse.status}): ${responseText}`);
+        }
+        
+        // Parse the successful response
+        try {
+          const data = responseText ? JSON.parse(responseText) : {};
+          console.log('Raw API response:', data);
+          const voicesList = Array.isArray(data) ? data : (data.voices || []);
+          console.log('Processed voices list:', voicesList);
+          setVoices(voicesList);
+          
+          if (voicesList.length > 0 && !selectedVoice) {
+            setSelectedVoice(voicesList[0].voice_id);
+          }
+        } catch (e) {
+          console.error('Failed to parse response as JSON:', responseText);
+          throw new Error('Invalid response format from server');
+        }
+      } catch (err: any) {
+        console.error("Error fetching voices:", err);
+        setVoiceError(err.message || "Failed to load voices");
+      } finally {
+        setLoadingVoices(false);
+      }
+    };
+
+    fetchVoices();
+  }, [selectedVoice]);
 
   // Fetch assigned user from agent details (if present)
   useEffect(() => {
@@ -389,15 +470,18 @@ export default function AgentDetails() {
         <div className="flex-1 overflow-y-auto px-8 py-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Agent Info */}
-            <div className="space-y-2">
-              <h1 className="text-2xl font-semibold text-foreground">{agentName || "Agent"}</h1>
-              <div className="flex items-center space-x-2">
-                <Badge variant="secondary" className="bg-muted">
-                  {agentId}
-                </Badge>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h1 className="text-2xl font-semibold text-foreground">{agentName || "Agent"}</h1>
+                <div className="flex items-center space-x-2">
+                  <Badge variant="secondary" className="bg-muted">
+                    {agentId}
+                  </Badge>
+                </div>
               </div>
-            </div>
 
+
+            </div>
             {/* Admin Assignment Control */}
             {isAdmin && (
               <Card className="bg-card border-border">
@@ -460,6 +544,100 @@ export default function AgentDetails() {
               <div className="space-y-4">
             {/* Agent Section */}
               <h2 className="text-lg font-medium text-foreground">Agent</h2>
+              
+              {/* Voice Selection */}
+              <Card className="bg-card border-border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-foreground">Voice</CardTitle>
+                  <p className="text-xs text-muted-foreground">Choose the voice that will speak to your users.</p>
+                </CardHeader>
+                <CardContent>
+                  {loadingVoices ? (
+                    <div className="text-sm text-muted-foreground">Loading voices...</div>
+                  ) : voiceError ? (
+                    <div className="text-sm text-red-500">{voiceError}</div>
+                  ) : voices.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No voices available</div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Select 
+                        value={selectedVoice} 
+                        onValueChange={setSelectedVoice}
+                      >
+                        <SelectTrigger className="bg-muted border-border min-w-[220px]">
+                          <SelectValue placeholder="Select a voice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {voices.map((voice) => (
+                            <SelectItem 
+                              key={voice.voice_id} 
+                              value={voice.voice_id}
+                            >
+                              {voice.name} ({voice.labels?.gender || 'unknown'}, {voice.labels?.accent || 'en'})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          // TODO: Implement voice preview functionality
+                          const selected = voices.find(v => v.voice_id === selectedVoice);
+                          if (selected?.preview_url) {
+                            const audio = new Audio(selected.preview_url);
+                            audio.play();
+                          }
+                        }}
+                      >
+                        Listen
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          if (!selectedVoice) return;
+                          
+                          try {
+                            setSavingVoice(true);
+                            setVoiceError(null);
+                            setSaveSuccess(false);
+                            
+                            const token = localStorage.getItem("token");
+                            const response = await fetch(`/api/agents/${params?.id}/voice`, {
+                              method: 'PATCH',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': token ? `Bearer ${token}` : '',
+                              },
+                              body: JSON.stringify({ voice_id: selectedVoice })
+                            });
+                            
+                            if (!response.ok) {
+                              const error = await response.json();
+                              throw new Error(error.message || 'Failed to save voice selection');
+                            }
+                            
+                            setSaveSuccess(true);
+                            setTimeout(() => setSaveSuccess(false), 3000);
+                          } catch (error) {
+                            console.error('Error saving voice:', error);
+                            const errorMessage = error instanceof Error ? error.message : 'Failed to save voice selection';
+                            setVoiceError(errorMessage);
+                          } finally {
+                            setSavingVoice(false);
+                          }
+                        }}
+                        disabled={savingVoice || !selectedVoice}
+                      >
+                        {savingVoice ? 'Saving...' : 'Save'}
+                      </Button>
+                      {saveSuccess && <span className="text-xs text-green-600 ml-2">Voice saved!</span>}
+                      {voiceError && <span className="text-xs text-red-500 ml-2">{voiceError}</span>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
               
               {/* First Message */}
               <Card className="bg-card border-border">

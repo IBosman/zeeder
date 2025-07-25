@@ -48,11 +48,11 @@ export default function Sidebar({ isOpen: isOpenProp, onClose }: SidebarProps) {
       )}
       
       <aside 
-        className={`fixed md:static inset-y-0 left-0 z-40 w-60 bg-card flex flex-col border-r border-border transition-transform duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 z-40 w-60 bg-card flex flex-col border-r border-border transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
       >
-        <div className="flex-1 flex flex-col overflow-y-auto">
+        <div className="flex-1 flex flex-col overflow-y-auto h-screen">
       {/* Logo/Brand Section - Hidden on mobile */}
       <div className="hidden md:block p-4 border-b border-border">
         <div className="flex items-center justify-center">

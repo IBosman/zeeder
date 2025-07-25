@@ -42,8 +42,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!response.ok) {
           return res.status(response.status).json({ message: "Failed to fetch agents from ElevenLabs" });
         }
-        const data = await response.json();
-        return res.json(data);
+        const data: unknown = await response.json();
+        const voices = (Array.isArray(data) ? data : (data as any)?.voices || []) as Array<{
+          voice_id: string;
+          name: string;
+          category: string;
+          preview_url: string;
+          labels: Record<string, string>;
+        }>;
+        return res.json(voices);
       } catch (err) {
         return res.status(500).json({ message: "Error fetching agents from ElevenLabs" });
       }
@@ -105,13 +112,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { systemPrompt, firstMessage, knowledgeBase, tools } = req.body;
       // Build the PATCH payload for ElevenLabs (nested structure)
       const payload: any = { conversation_config: { agent: {} } };
-      if (systemPrompt !== undefined || knowledgeBase !== undefined || tools !== undefined) {
-        payload.conversation_config.agent.prompt = {};
-        if (systemPrompt !== undefined) payload.conversation_config.agent.prompt.prompt = systemPrompt;
-        if (knowledgeBase !== undefined) payload.conversation_config.agent.prompt.knowledge_base = knowledgeBase;
-        if (tools !== undefined) payload.conversation_config.agent.prompt.tools = tools;
+      if (systemPrompt !== undefined) {
+        if (!payload.conversation_config) payload.conversation_config = {};
+        if (!payload.conversation_config.agent) payload.conversation_config.agent = {};
+        if (!payload.conversation_config.agent.prompt) payload.conversation_config.agent.prompt = {};
+        payload.conversation_config.agent.prompt.prompt = systemPrompt;
       }
-      if (firstMessage !== undefined) payload.conversation_config.agent.first_message = firstMessage;
+      if (knowledgeBase !== undefined) {
+        if (!payload.conversation_config) payload.conversation_config = {};
+        if (!payload.conversation_config.agent) payload.conversation_config.agent = {};
+        if (!payload.conversation_config.agent.prompt) payload.conversation_config.agent.prompt = {};
+        payload.conversation_config.agent.prompt.knowledge_base = knowledgeBase;
+      }
+      if (tools !== undefined) {
+        if (!payload.conversation_config) payload.conversation_config = {};
+        if (!payload.conversation_config.agent) payload.conversation_config.agent = {};
+        if (!payload.conversation_config.agent.prompt) payload.conversation_config.agent.prompt = {};
+        payload.conversation_config.agent.prompt.tools = tools;
+      }
+      if (firstMessage !== undefined) {
+        if (!payload.conversation_config) payload.conversation_config = {};
+        if (!payload.conversation_config.agent) payload.conversation_config.agent = {};
+        payload.conversation_config.agent.first_message = firstMessage;
+      }
       try {
         const response = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${elevenlabsAgentId}`, {
           method: "PATCH",
@@ -248,6 +271,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return oldJson.call(this, body);
     };
     next();
+  });
+
+  // Update agent's voice
+  app.patch("/api/agents/:id/voice", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const elevenlabsApiKey = process.env.ELEVENLABS_API_KEY;
+      if (!elevenlabsApiKey) {
+        return res.status(500).json({ message: "Missing ElevenLabs API key" });
+      }
+
+      const { voice_id } = req.body;
+      if (!voice_id) {
+        return res.status(400).json({ message: "Voice ID is required" });
+      }
+
+      // First get the agent to ensure it exists and user has access
+      const userId = (req as any).user.id;
+      const agentId = req.params.id;
+      
+      // Try to find agent by elevenlabs_agent_id first
+      let agent = await storage.getAgentByElevenlabsId(agentId);
+      
+      // If not found by elevenlabs_agent_id, try by numeric ID
+      if (!agent) {
+        agent = await storage.getAgentById(Number(agentId));
+      }
+      
+      if (!agent || agent.userId !== userId) {
+        return res.status(404).json({ message: "Agent not found or not authorized" });
+      }
+
+      // Update the voice in ElevenLabs
+      const response = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${agent.elevenlabsAgentId}`, {
+        method: "PATCH",
+        headers: {
+          "xi-api-key": elevenlabsApiKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          conversation_config: {
+            tts: {
+              voice_id: voice_id
+            }
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Failed to update agent voice:', error);
+        return res.status(response.status).json({ 
+          message: "Failed to update agent voice",
+          details: error 
+        });
+      }
+
+      // Update the agent in our database
+      const updatedAgent = await storage.updateAgent(agent.id, { 
+        // @ts-ignore - voiceId is a valid field in the Agent type
+        voiceId: voice_id 
+      });
+
+      res.json({ 
+        success: true, 
+        agent: updatedAgent 
+      });
+    } catch (err: unknown) {
+      console.error('Error updating agent voice:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      res.status(500).json({ 
+        message: "Error updating agent voice",
+        error: errorMessage
+      });
+    }
+  });
+
+  // Get available voices
+  app.get("/api/voices", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const elevenlabsApiKey = process.env.ELEVENLABS_API_KEY;
+      if (!elevenlabsApiKey) {
+        return res.status(500).json({ message: "Missing ElevenLabs API key" });
+      }
+      
+      const response = await fetch("https://api.elevenlabs.io/v1/voices", {
+        headers: {
+          "xi-api-key": elevenlabsApiKey,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('ElevenLabs API error:', error);
+        return res.status(response.status).json({ message: "Failed to fetch voices from ElevenLabs" });
+      }
+      
+      const data = await response.json();
+      // Return the voices in the expected format
+      res.json({
+        voices: data.voices?.map((voice: any) => ({
+          voice_id: voice.voice_id,
+          name: voice.name,
+          category: voice.category,
+          preview_url: voice.preview_url,
+          labels: voice.labels
+        })) || []
+      });
+    } catch (err) {
+      console.error('Error fetching voices:', err);
+      res.status(500).json({ message: "Error fetching voices" });
+    }
   });
 
   // List agents for the authenticated user
@@ -487,7 +622,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { systemPrompt, firstMessage, knowledgeBase, tools } = req.body;
 
     // Build the PATCH payload for ElevenLabs (nested structure)
-    const payload: any = { conversation_config: { agent: {} } };
+    interface AgentConfig {
+      conversation_config?: {
+        agent?: {
+          prompt?: {
+            prompt?: string;
+            knowledge_base?: any;
+            tools?: any[];
+          };
+          first_message?: string;
+        };
+      };
+    }
+    
+    const payload: AgentConfig = { conversation_config: { agent: {} } };
     if (systemPrompt !== undefined || knowledgeBase !== undefined || tools !== undefined) {
       payload.conversation_config.agent.prompt = {};
       if (systemPrompt !== undefined) payload.conversation_config.agent.prompt.prompt = systemPrompt;
