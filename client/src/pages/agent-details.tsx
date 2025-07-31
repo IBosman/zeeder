@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, JSX } from "react";
 import { useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Copy, MoreHorizontal, Bot, ChevronLeft, FileText, Trash2 } from "lucide-react";
+import { Plus, Copy, MoreHorizontal, Bot, ChevronLeft, FileText, Trash2, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,12 @@ export default function AgentDetails() {
   const [useRAG, setUseRAG] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Phone number state
+  const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
+  const [phoneNumberLabel, setPhoneNumberLabel] = useState<string | null>(null);
+  const [loadingPhoneNumber, setLoadingPhoneNumber] = useState(false);
+  const [phoneNumberError, setPhoneNumberError] = useState<string | null>(null);
   
   // Tool switches
   const [endCall, setEndCall] = useState(false);
@@ -110,10 +116,10 @@ export default function AgentDetails() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [users, setUsers] = useState<any[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [usersError, setUsersError] = useState<string | null>(null);
-  const [assignedUserId, setAssignedUserId] = useState<string | null>(null);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companiesError, setCompaniesError] = useState<string | null>(null);
+  const [assignedCompanyId, setAssignedCompanyId] = useState<string | null>(null);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
   const [assignSuccess, setAssignSuccess] = useState(false);
@@ -127,33 +133,79 @@ export default function AgentDetails() {
   const [selectedVoice, setSelectedVoice] = useState<string>("");
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Fetch all users for assignment dropdown (admin only)
+  // Fetch all companies for assignment dropdown (admin only)
   useEffect(() => {
     if (!isAdmin) return;
-    setUsersLoading(true);
-    setUsersError(null);
-    fetch("/api/admin/users", {
+    setCompaniesLoading(true);
+    setCompaniesError(null);
+    fetch("/api/admin/companies", {
       headers: {
         "Authorization": localStorage.getItem("token") ? `Bearer ${localStorage.getItem("token")}` : "",
         "Content-Type": "application/json"
       },
     })
       .then(res => {
-        if (!res.ok) throw new Error(`Failed to fetch users: ${res.status}`);
+        if (!res.ok) throw new Error(`Failed to fetch companies: ${res.status}`);
         return res.json();
       })
-      .then(data => setUsers(data.users || []))
-      .catch(err => setUsersError(err.message || "Unknown error"))
-      .finally(() => setUsersLoading(false));
+      .then(data => setCompanies(data.companies || []))
+      .catch(err => setCompaniesError(err.message || "Unknown error"))
+      .finally(() => setCompaniesLoading(false));
   }, [isAdmin]);
 
-  // Fetch available voices
+  // Fetch available voices based on the assigned company
   useEffect(() => {
     const fetchVoices = async () => {
       try {
         setLoadingVoices(true);
         const token = localStorage.getItem("token");
         
+        // If we have an assigned company, fetch only voices for that company
+        if (assignedCompanyId) {
+          try {
+            const companyVoicesResponse = await fetch(`/api/companies/${assignedCompanyId}/voices`, {
+              headers: {
+                "Authorization": token ? `Bearer ${token}` : "",
+                "Content-Type": "application/json"
+              }
+            });
+            
+            if (companyVoicesResponse.ok) {
+              const data = await companyVoicesResponse.json();
+              console.log('Company voices response:', data);
+              
+              if (data.success && Array.isArray(data.voices)) {
+                const companyVoicesList = data.voices;
+                
+                if (companyVoicesList.length > 0) {
+                  console.log('Using company-specific voices:', companyVoicesList);
+                  setVoices(companyVoicesList);
+                  
+                  // Check if current selected voice is in the list
+                  const voiceExists = companyVoicesList.some((v: any) => 
+                    v.voice_id === selectedVoice
+                  );
+                  
+                  if (!selectedVoice || !voiceExists) {
+                    // Select the first available voice
+                    setSelectedVoice(companyVoicesList[0].voice_id);
+                  }
+                  return;
+                } else {
+                  console.log('Company has no assigned voices');
+                }
+              } else {
+                console.warn('Invalid response format from company voices API:', data);
+              }
+            } else {
+              console.warn('Failed to fetch company voices:', await companyVoicesResponse.text());
+            }
+          } catch (err) {
+            console.error('Error fetching company voices:', err);
+          }
+        }
+        
+        // If no company is assigned or the company has no voices, fall back to all voices
         // First check if the endpoint exists
         const response = await fetch("/api/voices", {
           method: 'HEAD',
@@ -219,12 +271,13 @@ export default function AgentDetails() {
     };
 
     fetchVoices();
-  }, [selectedVoice]);
+  }, [assignedCompanyId, selectedVoice]);
 
   // Fetch assigned user from agent details (if present)
   useEffect(() => {
     if (!params?.id) return;
     async function fetchAssignment() {
+      console.log('=== FETCH ASSIGNMENT STARTED ===');
       try {
         const token = localStorage.getItem("token");
         const res = await fetch(`/api/agents/${params?.id}/details`, {
@@ -233,17 +286,24 @@ export default function AgentDetails() {
             "Content-Type": "application/json"
           },
         });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.userId || data.user_id || data.assignedUserId) {
-          setAssignedUserId(String(data.userId || data.user_id || data.assignedUserId));
+        if (!res.ok) {
+          console.error('Failed to fetch agent details:', res.status);
+          return;
         }
-      } catch {}
+        const data = await res.json();
+        const companyId = data.companyId || data.company_id || data.assignedCompanyId || "";
+        console.log("Fetched company ID for agent:", companyId, "Raw data:", data);
+        console.log('Setting assignedCompanyId state to:', companyId);
+        setAssignedCompanyId(companyId);
+      } catch (e) {
+        console.error("Error in fetchAssignment:", e);
+      }
+      console.log('=== FETCH ASSIGNMENT COMPLETED ===');
     }
     fetchAssignment();
   }, [params?.id]);
 
-  async function handleAssignUser(newUserId: string) {
+  async function handleAssignCompany(newCompanyId: string) {
     setAssigning(true);
     setAssignError(null);
     setAssignSuccess(false);
@@ -251,12 +311,12 @@ export default function AgentDetails() {
       const token = localStorage.getItem("token");
       const currentAdmin = localStorage.getItem("username") || "admin";
       const body = {
-        userId: newUserId,
+        companyId: newCompanyId,
         name: agentName,
         elevenlabsAgentId: agentId || params?.id,
         createdBy: createdBy || currentAdmin // fallback if missing
       };
-      const res = await fetch("/api/admin/assign-agent", {
+      const res = await fetch("/api/admin/assign-agent-to-company", {
         method: "POST",
         headers: {
           "Authorization": token ? `Bearer ${token}` : "",
@@ -268,7 +328,7 @@ export default function AgentDetails() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || `Failed to assign: ${res.status}`);
       }
-      setAssignedUserId(newUserId);
+      setAssignedCompanyId(newCompanyId);
       setAssignSuccess(true);
       setTimeout(() => setAssignSuccess(false), 2000);
     } catch (err: any) {
@@ -368,42 +428,8 @@ export default function AgentDetails() {
     }
   }
 
-  useEffect(() => {
-    async function fetchAgentDetails() {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/agents/${params?.id}/details`, {
-          headers: {
-            "Authorization": token ? `Bearer ${token}` : "",
-            "Content-Type": "application/json"
-          },
-        });
-        if (!res.ok) throw new Error(`Failed to fetch agent: ${res.status}`);
-        const data = await res.json();
-        setFirstMessage(data.firstMessage || "");
-        setSystemPrompt(data.systemPrompt || "");
-        setKnowledgeBase(Array.isArray(data.knowledgeBase) ? data.knowledgeBase : []);
-        setAgentName(data.name || "");
-        setAgentId(data.elevenlabsAgentId || data.agentId || params?.id || "");
-        setCreatedBy(data.createdBy || "");
-        if (Array.isArray(data.tools)) {
-          setEndCall(!!data.tools.find((t: any) => t.name === "end_call"));
-          setDetectLanguage(!!data.tools.find((t: any) => t.name === "language_detection"));
-          setSkipTurn(!!data.tools.find((t: any) => t.name === "skip_turn"));
-          setPlayKeypedTone(!!data.tools.find((t: any) => t.name === "play_keypad_touch_tone"));
-        }
-      } catch (err: any) {
-        setError(err.message || "Unknown error");
-      } finally {
-        setLoading(false);
-      }
-    }
-    if (params?.id) fetchAgentDetails();
-  }, [params?.id]);
-
-  async function saveFirstMessage() {
+  // Implement the save functions directly
+  const handleSaveFirstMessage = async () => {
     setSavingFirstMessage(true);
     setSaveErrorFirstMessage(null);
     try {
@@ -422,9 +448,9 @@ export default function AgentDetails() {
     } finally {
       setSavingFirstMessage(false);
     }
-  }
+  };
 
-  async function saveSystemPrompt() {
+  const handleSaveSystemPrompt = async () => {
     setSavingPrompt(true);
     setSaveErrorPrompt(null);
     try {
@@ -443,7 +469,214 @@ export default function AgentDetails() {
     } finally {
       setSavingPrompt(false);
     }
-  }
+  };
+  
+
+  // Fetch available voices based on the assigned company
+  const fetchVoices = async () => {
+    console.log('=== FETCH VOICES STARTED ===');
+    console.log('Current assignedCompanyId:', assignedCompanyId);
+    console.log('Current selectedVoice:', selectedVoice);
+    
+    // Reset state at the beginning to ensure we're not showing stale data
+    setVoices([]);
+    setSelectedVoice("");
+    setVoiceError("");
+    setLoadingVoices(true);
+    
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Double check that we still have a valid company ID
+      const currentCompanyId = assignedCompanyId;
+      console.log('Double checking company ID before fetch:', currentCompanyId);
+      
+      // If we have an assigned company, fetch only voices for that company and DO NOT fall back to all voices
+      if (
+        currentCompanyId &&
+        currentCompanyId !== "null" &&
+        currentCompanyId !== "undefined" &&
+        currentCompanyId !== ""
+      ) {
+        try {
+          const apiUrl = `/api/companies/${currentCompanyId}/voices`;
+          console.log('Fetching company voices from:', apiUrl);
+          const companyVoicesResponse = await fetch(apiUrl, {
+            headers: {
+              "Authorization": token ? `Bearer ${token}` : "",
+              "Content-Type": "application/json"
+            }
+          });
+          
+          if (companyVoicesResponse.ok) {
+            const data = await companyVoicesResponse.json();
+            console.log('Company voices response:', data);
+            
+            if (data.success && Array.isArray(data.voices)) {
+              const companyVoicesList = data.voices;
+              
+              if (companyVoicesList.length > 0) {
+                console.log('Using company-specific voices:', companyVoicesList);
+                setVoices(companyVoicesList);
+                
+                // Check if current selected voice is in the list
+                const voiceExists = companyVoicesList.some((v: any) => 
+                  v.voice_id === selectedVoice
+                );
+                
+                if (!selectedVoice || !voiceExists) {
+                  // Select the first available voice
+                  setSelectedVoice(companyVoicesList[0].voice_id);
+                }
+                setLoadingVoices(false);
+                return;
+              } else {
+                console.log('Company has no assigned voices');
+                setVoices([]);
+                setSelectedVoice(""); // Clear selection when no voices
+                setVoiceError("No voices assigned to this company");
+                setLoadingVoices(false);
+                return;
+              }
+            } else {
+              console.warn('Invalid response format from company voices API:', data);
+              setVoices([]);
+              setSelectedVoice(""); // Clear selection when no voices
+              return;
+            }
+          } else {
+            console.warn('Failed to fetch company voices:', await companyVoicesResponse.text());
+            setVoices([]);
+            setSelectedVoice(""); // Clear selection when no voices
+            return;
+          }
+        } catch (err) {
+          console.error('Error fetching company voices:', err);
+          setVoices([]);
+          setSelectedVoice(""); // Clear selection when no voices
+          return;
+        }
+      }
+      
+      // At this point, if we had a company ID but got here, something went wrong
+      // We've already set voices to [] and selectedVoice to "" at the start of the function
+      // So we just return and don't try to fetch all voices
+      return;
+      
+      // IMPORTANT: We never want to fetch all voices when a company is assigned
+      // If we got here, it means we either have no company assigned or something went wrong
+      console.log('No company assigned or invalid company ID, not fetching any voices');
+      setVoices([]);
+      setSelectedVoice("");
+      setVoiceError("Please assign a company to this agent first");
+    } catch (err: any) {
+      console.error("Error fetching voices:", err);
+      setVoiceError(err.message || "Failed to load voices");
+    } finally {
+      setLoadingVoices(false);
+      console.log('=== FETCH VOICES COMPLETED ===');
+      console.log('Final voices state:', voices);
+      console.log('Final selectedVoice state:', selectedVoice);
+    }
+  };
+
+  // This effect runs whenever assignedCompanyId changes
+  useEffect(() => {
+    console.log('assignedCompanyId changed:', assignedCompanyId);
+    
+    // Clear previous state to avoid showing stale data
+    setVoices([]);
+    setSelectedVoice("");
+    setVoiceError("");
+    setLoadingVoices(true);
+    
+    if (
+      assignedCompanyId &&
+      assignedCompanyId !== "null" &&
+      assignedCompanyId !== "undefined" &&
+      assignedCompanyId !== ""
+    ) {
+      console.log('Valid company ID detected:', assignedCompanyId);
+      console.log('Triggering fetchVoices with company ID');
+      
+      // Fetch voices immediately - we don't need a delay
+      fetchVoices();
+    } else {
+      console.log('No valid assignedCompanyId, skipping fetchVoices. Current value:', assignedCompanyId);
+      // Explicitly clear voices and selectedVoice when no company is assigned
+      console.log('No company assigned, clearing voices and selectedVoice');
+      setVoiceError("Please assign a company to this agent first");
+      setLoadingVoices(false);
+    }
+  }, [assignedCompanyId]);
+
+  useEffect(() => {
+    async function fetchPhoneNumber(agentId: string) {
+      if (!agentId) return;
+      
+      setLoadingPhoneNumber(true);
+      setPhoneNumberError(null);
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/agents/${agentId}/phone`, {
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : ""
+          }
+        });
+        
+        if (!res.ok) throw new Error(`Failed to fetch phone number: ${res.status}`);
+        
+        const data = await res.json();
+        setPhoneNumber(data.phoneNumber);
+        setPhoneNumberLabel(data.phoneNumberLabel);
+        
+        console.log('Phone number data:', data);
+      } catch (err: any) {
+        console.error('Error fetching phone number:', err);
+        setPhoneNumberError(err.message || "Unknown error");
+      } finally {
+        setLoadingPhoneNumber(false);
+      }
+    }
+  
+    async function fetchAgentDetails() {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`/api/agents/${params?.id}/details`, {
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : ""
+          }
+        });
+        if (!res.ok) throw new Error(`Failed to fetch agent details: ${res.status}`);
+        const data = await res.json();
+        
+        setAgentName(data.name || "Unnamed Agent");
+        setFirstMessage(data.firstMessage || "");
+        setSystemPrompt(data.systemPrompt || "");
+        setAgentId(data.agentId || params?.id || "");
+        
+        // Fetch phone number after getting agent details
+        fetchPhoneNumber(data.agentId || params?.id || "");
+        
+        setCreatedBy(data.createdBy || "");
+        if (Array.isArray(data.tools)) {
+          setEndCall(!!data.tools.find((t: any) => t.name === "end_call"));
+          setDetectLanguage(!!data.tools.find((t: any) => t.name === "language_detection"));
+          setSkipTurn(!!data.tools.find((t: any) => t.name === "skip_turn"));
+          setPlayKeypedTone(!!data.tools.find((t: any) => t.name === "play_keypad_touch_tone"));
+        }
+      } catch (err: any) {
+        setError(err.message || "Unknown error");
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (params?.id) fetchAgentDetails();
+  }, [params?.id]);
+
+  // Functions moved to handleSaveFirstMessage and handleSaveSystemPrompt
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -477,6 +710,20 @@ export default function AgentDetails() {
                   <Badge variant="secondary" className="bg-muted">
                     {agentId}
                   </Badge>
+                  
+                  {/* Phone number display */}
+                  <Badge variant="outline" className="flex items-center gap-1">
+                    <span role="img" aria-label="phone">📱</span>
+                    {loadingPhoneNumber ? (
+                      <span className="text-xs">Loading...</span>
+                    ) : phoneNumberError ? (
+                      <span className="text-xs text-red-500">Error loading phone</span>
+                    ) : phoneNumber ? (
+                      <span>{phoneNumber}</span>
+                    ) : (
+                      <span className="text-muted-foreground">No phone number</span>
+                    )}
+                  </Badge>
                 </div>
               </div>
 
@@ -487,33 +734,33 @@ export default function AgentDetails() {
               <Card className="bg-card border-border">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <span role="img" aria-label="assigned user">🧑‍🤝‍🧑</span> Assigned User
+                    <span role="img" aria-label="assigned company">🏢</span> Assigned Company
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">This agent is assigned to:</p>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {usersLoading ? (
-                    <div>Loading users...</div>
-                  ) : usersError ? (
-                    <div className="text-red-500 text-xs">{usersError}</div>
+                  {companiesLoading ? (
+                    <div>Loading companies...</div>
+                  ) : companiesError ? (
+                    <div className="text-red-500 text-xs">{companiesError}</div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <Select
-                        value={assignedUserId || ""}
-                        onValueChange={setAssignedUserId}
+                        value={assignedCompanyId || ""}
+                        onValueChange={setAssignedCompanyId}
                         disabled={assigning}
                       >
                         <SelectTrigger className="bg-muted border-border min-w-[220px]">
-                          <SelectValue placeholder="Select user" />
+                          <SelectValue placeholder="Select company" />
                         </SelectTrigger>
                         <SelectContent>
-                          {users.map((user: any) => (
+                          {companies.map((company: any) => (
                             <SelectItem
-                              key={user.id}
-                              value={String(user.id)}
-                              disabled={user.id === assignedUserId}
+                              key={company.id}
+                              value={String(company.id)}
+                              disabled={company.id === assignedCompanyId}
                             >
-                              {user.username} ({user.role})
+                              {company.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -521,8 +768,8 @@ export default function AgentDetails() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => assignedUserId && handleAssignUser(assignedUserId)}
-                        disabled={assigning || !assignedUserId}
+                        onClick={() => assignedCompanyId && handleAssignCompany(assignedCompanyId)}
+                        disabled={assigning || !assignedCompanyId}
                       >
                         {assigning ? "Assigning..." : "Assign"}
                       </Button>
@@ -553,11 +800,17 @@ export default function AgentDetails() {
                 </CardHeader>
                 <CardContent>
                   {loadingVoices ? (
-                    <div className="text-sm text-muted-foreground">Loading voices...</div>
+                    <div className="flex items-center justify-center py-4">
+                      <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
                   ) : voiceError ? (
                     <div className="text-sm text-red-500">{voiceError}</div>
                   ) : voices.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">No voices available</div>
+                    <div className="text-sm text-muted-foreground py-2 border border-border rounded-md p-4 text-center">
+                      {assignedCompanyId ? 
+                        "No voices assigned to this company. Please assign voices in the company management page." : 
+                        "No voices available. Please assign a company first."}
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <Select 
@@ -568,12 +821,14 @@ export default function AgentDetails() {
                           <SelectValue placeholder="Select a voice" />
                         </SelectTrigger>
                         <SelectContent>
-                          {voices.map((voice) => (
+                          {voices.filter(voice => voice && (voice.voice_id || voice.voiceId) && voice.name).map((voice) => (
                             <SelectItem 
-                              key={voice.voice_id} 
-                              value={voice.voice_id}
+                              key={voice.voice_id || voice.voiceId} 
+                              value={voice.voice_id || voice.voiceId}
                             >
-                              {voice.name} ({voice.labels?.gender || 'unknown'}, {voice.labels?.accent || 'en'})
+                              {voice.name || 'Unknown Voice'} 
+                              {voice.labels ? `(${voice.labels?.gender || 'unknown'}, ${voice.labels?.accent || 'en'})` : ''}
+                              {voice.category ? `(${voice.category})` : ''}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -582,11 +837,57 @@ export default function AgentDetails() {
                         variant="outline" 
                         size="sm"
                         onClick={() => {
-                          // TODO: Implement voice preview functionality
-                          const selected = voices.find(v => v.voice_id === selectedVoice);
-                          if (selected?.preview_url) {
-                            const audio = new Audio(selected.preview_url);
-                            audio.play();
+                          if (!selectedVoice || !voices || voices.length === 0) {
+                            console.warn('No voice selected or no voices available');
+                            return;
+                          }
+                          
+                          try {
+                            const selected = voices.find(v => 
+                              v && ((v.voice_id === selectedVoice) || (v.voiceId === selectedVoice))
+                            );
+                            
+                            if (!selected) {
+                              console.warn(`Selected voice ${selectedVoice} not found in voices list`);
+                              return;
+                            }
+                            
+                            // Check all possible preview URL locations in the voice object
+                            const previewUrl = selected?.preview_url || 
+                                              selected?.previewUrl || 
+                                              (selected as any)?.samples?.[0]?.audio || 
+                                              (selected as any)?.preview_audio;
+                            
+                            console.log('Voice object:', selected);
+                            console.log('Preview URL found:', previewUrl);
+                            
+                            if (previewUrl) {
+                              // Create an audio element and play it
+                              const audio = new Audio(previewUrl);
+                              
+                              // Add event listeners for better user feedback
+                              audio.addEventListener('playing', () => {
+                                console.log('Audio playback started');
+                              });
+                              
+                              audio.addEventListener('error', (e) => {
+                                console.error('Audio playback error:', e);
+                                alert('Failed to play voice preview. Please try again.');
+                              });
+                              
+                              // Start playback
+                              audio.play()
+                                .catch(playError => {
+                                  console.error('Error during audio playback:', playError);
+                                  alert('Failed to play voice preview: ' + playError.message);
+                                });
+                            } else {
+                              console.warn('No preview URL available for selected voice');
+                              alert('This voice does not have a preview audio available.');
+                            }
+                          } catch (err) {
+                            console.error('Error playing voice preview:', err);
+                            alert('An error occurred while trying to play the voice preview.');
                           }
                         }}
                       >
@@ -596,7 +897,10 @@ export default function AgentDetails() {
                         variant="outline" 
                         size="sm"
                         onClick={async () => {
-                          if (!selectedVoice) return;
+                          if (!selectedVoice) {
+                            console.log('No voice selected, cannot save');
+                            return;
+                          }
                           
                           try {
                             setSavingVoice(true);
@@ -658,7 +962,7 @@ export default function AgentDetails() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={saveFirstMessage}
+                        onClick={handleSaveFirstMessage}
                         disabled={savingFirstMessage}
                       >
                         {savingFirstMessage ? "Saving..." : "Save"}
@@ -692,7 +996,7 @@ export default function AgentDetails() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={saveSystemPrompt}
+                        onClick={handleSaveSystemPrompt}
                         disabled={savingPrompt}
                       >
                         {savingPrompt ? "Saving..." : "Save"}

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, MoreHorizontal } from "lucide-react";
+import { Search, MoreHorizontal, Plus } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, Link } from "wouter";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -16,6 +17,23 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export default function AdminUsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,6 +43,15 @@ export default function AdminUsersPage() {
   const [, setLocation] = useLocation();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  // Add User Dialog State
+  const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState("user");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window !== 'undefined' && localStorage.getItem('role') !== 'admin') {
       setLocation('/login');
@@ -59,6 +86,64 @@ export default function AdminUsersPage() {
     user.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Function to reset the user form fields
+  const resetUserForm = () => {
+    setNewUsername("");
+    setNewPassword("");
+    setNewEmail("");
+    setNewRole("user");
+    setCreateUserError(null);
+  };
+
+  // Function to handle user creation
+  async function handleCreateUser() {
+    if (!newUsername.trim() || !newPassword.trim() || !newEmail.trim()) {
+      setCreateUserError("All fields are required");
+      return;
+    }
+    
+    setIsCreatingUser(true);
+    setCreateUserError(null);
+    
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          username: newUsername.trim(),
+          password: newPassword.trim(),
+          email: newEmail.trim(),
+          role: newRole
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || `Failed to create user: ${response.status}`);
+      }
+      
+      // Add the new user to the list
+      setUsers([...users, data]);
+      
+      // Close the dialog and reset form
+      setAddUserDialogOpen(false);
+      resetUserForm();
+      
+      // Show success message
+      toast.success(`User "${newUsername}" created successfully`);
+    } catch (err: any) {
+      console.error('Error creating user:', err);
+      setCreateUserError(err.message || "An unknown error occurred while creating the user");
+    } finally {
+      setIsCreatingUser(false);
+    }
+  }
+
   async function handleDeleteUser(userId: number) {
     setDeleteError(null);
     try {
@@ -92,6 +177,98 @@ export default function AdminUsersPage() {
               <h1 className="text-2xl font-semibold text-foreground">Users</h1>
               <p className="text-sm text-muted-foreground mt-1">Manage your users</p>
             </div>
+            <Dialog open={addUserDialogOpen} onOpenChange={setAddUserDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New User</DialogTitle>
+                  <DialogDescription>
+                    Enter the details for the new user account.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="username" className="text-sm font-medium">
+                      Username
+                    </Label>
+                    <Input
+                      id="username"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      placeholder="Enter username"
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-medium">
+                      Email
+                    </Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="Enter email address"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-medium">
+                      Password
+                    </Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Enter password"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="role" className="text-sm font-medium">
+                      Role
+                    </Label>
+                    <Select value={newRole} onValueChange={setNewRole}>
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  {createUserError && (
+                    <p className="text-sm text-destructive">{createUserError}</p>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setAddUserDialogOpen(false);
+                      resetUserForm();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleCreateUser} 
+                    disabled={!newUsername.trim() || !newPassword.trim() || !newEmail.trim() || isCreatingUser}
+                  >
+                    {isCreatingUser ? "Creating..." : "Create User"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </header>
         {/* Content Area */}

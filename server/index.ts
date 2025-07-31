@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer } from "http";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
+import { setupVite, serveStatic, log } from "./vite-setup";
 import dotenv from "dotenv";
 import { storage } from "./storage";
 
@@ -42,39 +43,53 @@ app.use((req, res, next) => {
 
 async function ensureDefaultAdmin() {
   const username = process.env.ADMIN_USERNAME || "admin";
+  const email = process.env.ADMIN_EMAIL || "admin@example.com";
   const password = process.env.ADMIN_PASSWORD || "changeme";
-  // Check if admin exists
-  const existing = await storage.getUserByUsername(username);
-  if (!existing) {
-    await storage.createUser({ username, password, role: "admin" });
-    console.log(`[BOOTSTRAP] Created default admin: ${username}`);
-  } else {
+  
+  // Check if admin exists by username or email
+  const existingUser = await storage.getUserByUsername(username);
+  const existingEmail = await storage.getUserByEmail(email);
+  
+  if (!existingUser && !existingEmail) {
+    await storage.createUser({ 
+      username, 
+      email,
+      password, 
+      role: "admin"
+    });
+    console.log(`[BOOTSTRAP] Created default admin: ${username} (${email})`);
+  } else if (existingUser) {
     console.log(`[BOOTSTRAP] Admin user already exists: ${username}`);
+  } else if (existingEmail) {
+    console.log(`[BOOTSTRAP] Admin email already in use: ${email}`);
   }
 }
 
 (async () => {
-  const server = await registerRoutes(app);
-  if (process.env.DEMO_MODE !== "true") {
-    await ensureDefaultAdmin();
-  }
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // First, set up Vite middleware
+  const server = createServer(app);
+  
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
+
+  // Then register API routes
+  await registerRoutes(app);
+  
+  if (process.env.DEMO_MODE !== "true") {
+    await ensureDefaultAdmin();
+  }
+
+  // Error handling middleware
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+
+    res.status(status).json({ message });
+    console.error('Error:', err);
+  });
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.

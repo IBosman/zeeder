@@ -15,7 +15,9 @@ import Login from "@/pages/login";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminUsersPage from "@/pages/admin-users";
 import AdminUserDetailsPage from "./pages/admin-user-details";
-import Signup from "@/pages/signup";
+import AdminCompaniesPage from "./pages/admin-companies";
+import AdminCompanyDetailsPage from "./pages/admin-company-details";
+import AdminVoicesPage from "./pages/admin-voices";
 import Settings from "@/pages/settings";
 
 // Mobile header component
@@ -49,11 +51,13 @@ function Router() {
       <Route path="/agent/:id" component={AgentDetails} />
       <Route path="/billing" component={Billing} />
       <Route path="/login" component={Login} />
-      <Route path="/signup" component={Signup} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/agents" component={AdminDashboard} />
       <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/admin/users/:id" component={AdminUserDetailsPage} />
+      <Route path="/admin/companies" component={AdminCompaniesPage} />
+      <Route path="/admin/companies/:id" component={AdminCompanyDetailsPage} />
+      <Route path="/admin/voices" component={AdminVoicesPage} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
@@ -71,13 +75,13 @@ function App() {
   
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token && location !== "/login" && location !== "/signup") {
+    if (!token && location !== "/login") {
       setLocation("/login");
     }
   }, [location, setLocation]);
   
-  // Don't show sidebar on login/signup pages
-  const showSidebar = !['/login', '/signup'].includes(location);
+  // Don't show sidebar on login page
+  const showSidebar = !['/login'].includes(location);
   
   const toggleSidebar = () => {
     setIsSidebarOpen(prev => !prev);

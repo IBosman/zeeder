@@ -1,4 +1,4 @@
-import { Home, Users, CreditCard, Settings, ArrowLeft, Headphones, Bell, ChevronDown, User, Bot } from "lucide-react";
+import { Home, Users, CreditCard, Settings, ArrowLeft, Headphones, Bell, ChevronDown, User, Bot, Building2, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -37,6 +37,35 @@ export default function Sidebar({ isOpen: isOpenProp, onClose }: SidebarProps) {
   };
   const [location, navigate] = useLocation();
   const isAdmin = typeof window !== 'undefined' && localStorage.getItem('role') === 'admin';
+  const username = typeof window !== 'undefined' ? localStorage.getItem('username') || 'User' : 'User';
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  
+  // Fetch company name when component mounts
+  useEffect(() => {
+    async function fetchCompanyName() {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        const response = await fetch('/api/user/company', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.company) {
+            setCompanyName(data.company.name);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching company name:', error);
+      }
+    }
+    
+    fetchCompanyName();
+  }, []);
   return (
     <>
       {/* Overlay */}
@@ -113,18 +142,49 @@ export default function Sidebar({ isOpen: isOpenProp, onClose }: SidebarProps) {
               </Button>
             </li>
           )}
-          <li>
-            <Button
-              variant={location === "/billing" ? "secondary" : "ghost"}
-              className={
-                `w-full justify-start ${location === "/billing" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
-              }
-              onClick={() => navigate("/billing")}
-            >
-              <CreditCard className="h-4 w-4 mr-3" />
-              <span className="text-sm">Billing</span>
-            </Button>
-          </li>
+          {isAdmin && (
+            <>
+              <li>
+                <Button
+                  variant={location === "/admin/companies" ? "secondary" : "ghost"}
+                  className={
+                    `w-full justify-start ${location === "/admin/companies" ? "bg-muted text-foreground font-medium" : "text-muted-foreground"}`
+                  }
+                  onClick={() => navigate("/admin/companies")}
+                >
+                  <Building2 className="h-4 w-4 mr-3" />
+                  <span className="text-sm font-medium">Companies</span>
+                </Button>
+              </li>
+              <li>
+                <Button
+                  variant={location === "/admin/voices" ? "secondary" : "ghost"}
+                  className={
+                    `w-full justify-start ${location === "/admin/voices" ? "bg-muted text-foreground font-medium" : "text-muted-foreground"}`
+                  }
+                  onClick={() => navigate("/admin/voices")}
+                >
+                  <Volume2 className="h-4 w-4 mr-3" />
+                  <span className="text-sm font-medium">Voices</span>
+                </Button>
+              </li>
+            </>
+          )}
+          {/* Show billing only for non-admin users */}
+          {!isAdmin && (
+            <li>
+              <Button
+                variant={location === "/billing" ? "secondary" : "ghost"}
+                className={
+                  `w-full justify-start ${location === "/billing" ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`
+                }
+                onClick={() => navigate("/billing")}
+              >
+                <CreditCard className="h-4 w-4 mr-3" />
+                <span className="text-sm">Billing</span>
+              </Button>
+            </li>
+          )}
           <li>
             <Button
               variant={location === "/settings" ? "secondary" : "ghost"}
@@ -158,8 +218,8 @@ export default function Sidebar({ isOpen: isOpenProp, onClose }: SidebarProps) {
               <User className="h-4 w-4" />
             </div>
             <div className="flex-1 text-left">
-              <div className="text-sm font-medium">My Account</div>
-              <div className="text-xs text-muted-foreground">Workspace (5BAFCC8)</div>
+              <div className="text-sm font-medium">{username}</div>
+              <div className="text-xs text-muted-foreground">{companyName || 'No company assigned'}</div>
             </div>
           </div>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />

@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist/scripts",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "baseUrl": "."
+  },
+  "include": [
+    "server/scripts/*.ts",
+    "server/db.ts",
+    "shared/schema.ts"
+  ],
+  "exclude": ["node_modules"]
+}

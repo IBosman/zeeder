@@ -152,10 +152,6 @@ export default function Login() {
 
             {/* Additional Links */}
             <div className="text-center space-y-3 pt-4">
-              <p className="text-sm text-muted-foreground">
-                New to Zeeder?{" "}
-                <button className="text-primary hover:underline" type="button" onClick={() => setLocation("/signup")}>Create account</button>
-              </p>
               <button className="text-sm text-primary hover:underline">
                 Trouble signing in?
               </button>

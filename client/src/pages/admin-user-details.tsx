@@ -13,7 +13,7 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select";
-import AgentsTableUI from "@/components/agents-table-ui";
+import { Building2, Mail, Phone, Globe } from "lucide-react";
 
 export default function AdminUserDetailsPage() {
   const [match, params] = useRoute("/admin/users/:id");
@@ -21,14 +21,15 @@ export default function AdminUserDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editUsername, setEditUsername] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [userAgents, setUserAgents] = useState<any[]>([]);
-  const [userAgentsLoading, setUserAgentsLoading] = useState(false);
-  const [userAgentsError, setUserAgentsError] = useState<string | null>(null);
+  const [company, setCompany] = useState<any>(null);
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [companyError, setCompanyError] = useState<string | null>(null);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function AdminUserDetailsPage() {
         if (!found) throw new Error("User not found");
         setUser(found);
         setEditUsername(found.username || "");
+        setEditEmail(found.email || "");
         setEditRole(found.role || "user");
         setEditPassword("");
       } catch (err: any) {
@@ -67,28 +69,28 @@ export default function AdminUserDetailsPage() {
   }, [params?.id]);
 
   useEffect(() => {
-    async function fetchUserAgents() {
+    async function fetchUserCompany() {
       if (!params?.id) return;
-      setUserAgentsLoading(true);
-      setUserAgentsError(null);
+      setCompanyLoading(true);
+      setCompanyError(null);
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`/api/admin/user-agents/${params.id}`, {
+        const res = await fetch(`/api/admin/user-company/${params.id}`, {
           headers: {
             "Authorization": token ? `Bearer ${token}` : "",
             "Content-Type": "application/json"
           },
         });
-        if (!res.ok) throw new Error(`Failed to fetch agents: ${res.status}`);
+        if (!res.ok) throw new Error(`Failed to fetch company: ${res.status}`);
         const data = await res.json();
-        setUserAgents(data.agents || []);
+        setCompany(data.company || null);
       } catch (err: any) {
-        setUserAgentsError(err.message || "Unknown error");
+        setCompanyError(err.message || "Unknown error");
       } finally {
-        setUserAgentsLoading(false);
+        setCompanyLoading(false);
       }
     }
-    fetchUserAgents();
+    fetchUserCompany();
   }, [params?.id]);
 
   async function handleSave() {
@@ -99,6 +101,7 @@ export default function AdminUserDetailsPage() {
       const token = localStorage.getItem("token");
       const body: any = {};
       if (editUsername !== user.username) body.username = editUsername;
+      if (editEmail !== user.email) body.email = editEmail;
       if (editRole !== user.role) body.role = editRole;
       if (editPassword) body.password = editPassword;
       if (Object.keys(body).length === 0) {
@@ -177,6 +180,17 @@ export default function AdminUserDetailsPage() {
                         />
                       </div>
                       <div>
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={editEmail}
+                          onChange={e => setEditEmail(e.target.value)}
+                          className="bg-muted border-border mt-1"
+                          autoComplete="email"
+                        />
+                      </div>
+                      <div>
                         <Label htmlFor="password">Password</Label>
                         <Input
                           id="password"
@@ -218,21 +232,30 @@ export default function AdminUserDetailsPage() {
                 </Card>
               </div>
             )}
-            {/* Agents assigned to user */}
+            {/* Company Information */}
             <div className="mt-8">
               <Card className="bg-card border-border">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-foreground">Agents assigned to this user</CardTitle>
+                  <CardTitle className="text-sm font-medium text-foreground">Company Information</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {userAgentsLoading ? (
-                    <div className="p-4">Loading agents...</div>
-                  ) : userAgentsError ? (
-                    <div className="p-4 text-red-500">{userAgentsError}</div>
-                  ) : userAgents.length === 0 ? (
-                    <div className="p-4 text-muted-foreground">No agents assigned to this user.</div>
+                  {companyLoading ? (
+                    <div className="p-4">Loading company information...</div>
+                  ) : companyError ? (
+                    <div className="p-4 text-red-500">{companyError}</div>
+                  ) : !company ? (
+                    <div className="p-4 text-muted-foreground">No company assigned to this user.</div>
                   ) : (
-                    <AgentsTableUI agents={userAgents} searchQuery="" />
+                    <div className="space-y-4">
+                      <div className="flex items-start space-x-4">
+                        <div className="bg-primary/10 p-3 rounded-lg">
+                          <Building2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-foreground">{company.name}</h3>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
