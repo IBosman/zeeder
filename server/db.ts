@@ -12,7 +12,7 @@ const pool = mysql.createPool({
   password: process.env.DB_PASSWORD || "",
   database: process.env.DB_NAME || "leadsgpt",
   waitForConnections: true,
-  connectionLimit: 10,  // Maximum number of connections in the pool
+  connectionLimit: 3,  // Maximum number of connections in the pool
   queueLimit: 0,        // Unlimited queue size
   enableKeepAlive: true,
   keepAliveInitialDelay: 0
