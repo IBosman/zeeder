@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,11 +13,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(false);
   const [error, setError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [, setLocation] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSigningIn(true);
     try {
       const res = await fetch("/api/login", {
         method: "POST",
@@ -27,6 +29,7 @@ export default function Login() {
       if (!res.ok) {
         const data = await res.json();
         setError(data.message || "Login failed");
+        setSigningIn(false);
         return;
       }
       const data = await res.json();
@@ -40,6 +43,8 @@ export default function Login() {
       }
     } catch (err) {
       setError("Network error. Please try again.");
+    } finally {
+      setSigningIn(false);
     }
   };
 
@@ -144,9 +149,17 @@ export default function Login() {
               {/* Sign in Button */}
               <Button
                 type="submit"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium flex items-center justify-center"
+                disabled={signingIn}
               >
-                Sign in
+                {signingIn ? (
+                  <>
+                    Signing in
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                  </>
+                ) : (
+                  "Sign in"
+                )}
               </Button>
             </form>
 

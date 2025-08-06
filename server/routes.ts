@@ -710,13 +710,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update details/settings of a specific ElevenLabs agent for the authenticated user's company
   app.patch("/api/agents/:elevenlabsAgentId/details", requireAuth, async (req: Request, res: Response) => {
     const companyId = (req as any).user.companyId;
+    const userRole = (req as any).user.role;
     const elevenlabsAgentId = req.params.elevenlabsAgentId;
 
-    // Check if this agent is assigned to the user's company
-    const agents = await storage.getAgentsByCompanyId(companyId);
-    const agent = agents.find((a: any) => a.elevenlabsAgentId === elevenlabsAgentId);
-    if (!agent) {
-      return res.status(404).json({ message: "Agent not found or not assigned to your company" });
+    // If not admin, check if this agent is assigned to the user's company
+    if (userRole !== 'admin') {
+      const agents = await storage.getAgentsByCompanyId(companyId);
+      const agent = agents.find((a: any) => a.elevenlabsAgentId === elevenlabsAgentId);
+      if (!agent) {
+        return res.status(404).json({ message: "Agent not found or not assigned to your company" });
+      }
     }
 
     // Only allow certain fields to be updated
@@ -741,10 +744,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
       payload.conversation_config.agent.prompt = {};
       if (systemPrompt !== undefined) payload.conversation_config.agent.prompt.prompt = systemPrompt;
       if (knowledgeBase !== undefined) payload.conversation_config.agent.prompt.knowledge_base = knowledgeBase;
-      if (tools !== undefined) payload.conversation_config.agent.prompt.tools = tools;
+      
+      // Special handling for tools to ensure proper format
+      if (tools !== undefined) {
+        // Log the incoming tools data for debugging
+        console.log('Incoming tools data:', JSON.stringify(tools, null, 2));
+        
+        // Make sure tools is an array
+        if (!Array.isArray(tools)) {
+          return res.status(400).json({ message: "Tools must be an array" });
+        }
+        
+        // Validate each tool has required fields
+        for (const tool of tools) {
+          if (!tool.name || typeof tool.name !== 'string') {
+            return res.status(400).json({ message: "Each tool must have a name property" });
+          }
+        }
+        
+        // For webhook tools, ensure the structure matches what ElevenLabs expects
+        const processedTools = tools.map(tool => {
+          // For non-webhook tools, return as is
+          if (tool.type !== 'webhook') {
+            return tool;
+          }
+          
+          // Create a properly formatted webhook tool based on the working example
+          const processedTool = {
+            name: tool.name,
+            description: tool.description || '',
+            response_timeout_secs: 20,
+            disable_interruptions: false,
+            force_pre_tool_speech: false,
+            assignments: [],
+            type: 'webhook',
+            api_schema: {
+              url: tool.api_schema?.url || '',
+              method: tool.api_schema?.method || 'POST',
+              path_params_schema: {},
+              query_params_schema: null,
+              request_body_schema: {
+                type: 'object',
+                required: [] as string[],
+                description: tool.api_schema?.request_body_schema?.description || '',
+                properties: {} as Record<string, any>
+              },
+              request_headers: {},
+              auth_connection: null
+            },
+            dynamic_variables: {
+              dynamic_variable_placeholders: {}
+            }
+          };
+          
+          // Convert properties array to object format as required by ElevenLabs
+          if (Array.isArray(tool.api_schema?.request_body_schema?.properties)) {
+            tool.api_schema.request_body_schema.properties.forEach((prop: any) => {
+              if (prop.id) {
+                // Add each property to the properties object with the correct format
+                processedTool.api_schema.request_body_schema.properties[prop.id] = {
+                  type: prop.type || 'string',
+                  description: prop.description || '',
+                  dynamic_variable: '',
+                  constant_value: ''
+                };
+                
+                // If property is required, add it to the required array
+                if (prop.required) {
+                  processedTool.api_schema.request_body_schema.required.push(prop.id);
+                }
+              }
+            });
+          }
+          
+          return processedTool;
+        });
+        
+        payload.conversation_config.agent.prompt.tools = processedTools;
+      }
     }
     if (firstMessage !== undefined) payload.conversation_config.agent.first_message = firstMessage;
-
+    
+    // Log the final payload for debugging
+    console.log('Final payload to ElevenLabs:', JSON.stringify(payload, null, 2));
+    
+    // Send the PATCH request to ElevenLabs API
     try {
       const elevenlabsApiKey = process.env.ELEVENLABS_API_KEY;
       if (!elevenlabsApiKey) {
@@ -759,7 +843,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: JSON.stringify(payload)
       });
       if (!response.ok) {
-        return res.status(response.status).json({ message: "Failed to update agent details on ElevenLabs" });
+        const errorText = await response.text();
+        console.error('ElevenLabs API error:', response.status, errorText);
+        return res.status(response.status).json({ 
+          message: "Failed to update agent details on ElevenLabs", 
+          elevenlabsError: errorText 
+        });
       }
       const data = await response.json();
       res.json(data);

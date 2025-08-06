@@ -7,7 +7,9 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Copy, MoreHorizontal, Bot, ChevronLeft, FileText, Trash2, RefreshCw } from "lucide-react";
+import { Plus, Copy, MoreHorizontal, Bot, ChevronLeft, FileText, Trash2, RefreshCw, X } from "lucide-react";
+import { AgentDetailsSkeleton } from "@/components/agent-details-skeleton";
+import { CustomToolSidebar } from "../components/custom-tool-sidebar";
 import { Link } from "wouter";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -18,6 +20,7 @@ export default function AgentDetails() {
   const [systemPrompt, setSystemPrompt] = useState("You are interacting with a user who has initiated a spoken conversation directly from the ElevenLabs website.");
   const [useRAG, setUseRAG] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showingSkeleton, setShowingSkeleton] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Phone number state
@@ -37,6 +40,7 @@ export default function AgentDetails() {
   // Add tool save state
   const [savingTools, setSavingTools] = useState(false);
   const [saveErrorTools, setSaveErrorTools] = useState<string | null>(null);
+  const [customTools, setCustomTools] = useState<any[]>([]);
 
   // Tool definitions for toggling
   const TOOL_DEFS = [
@@ -101,6 +105,57 @@ export default function AgentDetails() {
       setSavingTools(false);
     }
   }
+  
+  async function handleDeleteTool(toolName: string) {
+    if (!confirm(`Are you sure you want to delete the "${toolName}" tool?`)) {
+      return;
+    }
+    
+    setSavingTools(true);
+    setSaveErrorTools(null);
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Get current agent details
+      const detailsRes = await fetch(`/api/agents/${params?.id}/details`, {
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : ""
+        }
+      });
+      
+      if (!detailsRes.ok) throw new Error(`Failed to fetch agent details: ${detailsRes.status}`);
+      const agentData = await detailsRes.json();
+      
+      // Filter out the tool to delete
+      const updatedTools = Array.isArray(agentData.tools) 
+        ? agentData.tools.filter((t: any) => t.name !== toolName)
+        : [];
+      
+      // Save the updated tools list
+      const saveRes = await fetch(`/api/agents/${params?.id}/details`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ tools: updatedTools })
+      });
+      
+      if (!saveRes.ok) {
+        const errorData = await saveRes.json().catch(() => ({}));
+        throw new Error(`Failed to save tools: ${saveRes.status}${errorData.elevenlabsError ? ' - ' + errorData.elevenlabsError : ''}${errorData.message ? ' - ' + errorData.message : ''}`);
+      }
+      
+      // Update the custom tools list
+      setCustomTools(customTools.filter(t => t.name !== toolName));
+      
+    } catch (err: any) {
+      setSaveErrorTools(err.message || "Unknown error");
+      alert("Error deleting tool: " + (err.message || "Unknown error"));
+    } finally {
+      setSavingTools(false);
+    }
+  }
 
   const [savingFirstMessage, setSavingFirstMessage] = useState(false);
   const [savingPrompt, setSavingPrompt] = useState(false);
@@ -132,6 +187,9 @@ export default function AgentDetails() {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [selectedVoice, setSelectedVoice] = useState<string>("");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isCustomToolOpen, setIsCustomToolOpen] = useState(false);
+  const [selectedCustomTool, setSelectedCustomTool] = useState<any | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Fetch all companies for assignment dropdown (admin only)
   useEffect(() => {
@@ -641,6 +699,7 @@ export default function AgentDetails() {
   
     async function fetchAgentDetails() {
       setLoading(true);
+      setShowingSkeleton(true);
       setError(null);
       try {
         const token = localStorage.getItem("token");
@@ -666,15 +725,27 @@ export default function AgentDetails() {
           setDetectLanguage(!!data.tools.find((t: any) => t.name === "language_detection"));
           setSkipTurn(!!data.tools.find((t: any) => t.name === "skip_turn"));
           setPlayKeypedTone(!!data.tools.find((t: any) => t.name === "play_keypad_touch_tone"));
+          
+          // Extract custom webhook tools
+          const webhookTools = data.tools.filter((t: any) => t.type === "webhook");
+          setCustomTools(webhookTools);
         }
       } catch (err: any) {
         setError(err.message || "Unknown error");
       } finally {
-        setLoading(false);
+        // Ensure skeleton shows for at least 500ms for better UX
+        const loadingStartTime = Date.now();
+        const minLoadingTime = 500; // milliseconds
+        const remainingTime = Math.max(0, minLoadingTime - (Date.now() - loadingStartTime));
+        
+        setTimeout(() => {
+          setLoading(false);
+          setShowingSkeleton(false);
+        }, remainingTime);
       }
     }
     if (params?.id) fetchAgentDetails();
-  }, [params?.id]);
+  }, [params?.id, refreshTrigger]);
 
   // Functions moved to handleSaveFirstMessage and handleSaveSystemPrompt
 
@@ -691,11 +762,7 @@ export default function AgentDetails() {
                 <span className="text-foreground">{agentName || "Agent"}</span>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </div>
+
           </div>
         </header>
 
@@ -740,7 +807,10 @@ export default function AgentDetails() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {companiesLoading ? (
-                    <div>Loading companies...</div>
+                    <div className="flex items-center gap-2">
+                      <div className="bg-muted animate-pulse h-10 w-[220px] rounded-md"></div>
+                      <div className="bg-muted animate-pulse h-10 w-24 rounded-md"></div>
+                    </div>
                   ) : companiesError ? (
                     <div className="text-red-500 text-xs">{companiesError}</div>
                   ) : (
@@ -771,7 +841,12 @@ export default function AgentDetails() {
                         onClick={() => assignedCompanyId && handleAssignCompany(assignedCompanyId)}
                         disabled={assigning || !assignedCompanyId}
                       >
-                        {assigning ? "Assigning..." : "Assign"}
+                        {assigning ? (
+                        <span className="flex items-center">
+                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                          Assigning...
+                        </span>
+                      ) : "Assign"}
                       </Button>
                       {assignError && <span className="text-xs text-red-500">{assignError}</span>}
                       {assignSuccess && <span className="text-xs text-green-600">Assigned!</span>}
@@ -783,8 +858,8 @@ export default function AgentDetails() {
 
             <Separator className="bg-border" />
 
-            {loading ? (
-              <div className="p-6">Loading agent details...</div>
+            {showingSkeleton ? (
+              <AgentDetailsSkeleton isAdmin={isAdmin} />
             ) : error ? (
               <div className="p-6 text-red-500">{error}</div>
             ) : (
@@ -800,8 +875,10 @@ export default function AgentDetails() {
                 </CardHeader>
                 <CardContent>
                   {loadingVoices ? (
-                    <div className="flex items-center justify-center py-4">
-                      <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <div className="flex items-center gap-2">
+                      <div className="bg-muted animate-pulse h-10 w-[220px] rounded-md"></div>
+                      <div className="bg-muted animate-pulse h-10 w-24 rounded-md"></div>
+                      <div className="bg-muted animate-pulse h-10 w-24 rounded-md"></div>
                     </div>
                   ) : voiceError ? (
                     <div className="text-sm text-red-500">{voiceError}</div>
@@ -934,7 +1011,12 @@ export default function AgentDetails() {
                         }}
                         disabled={savingVoice || !selectedVoice}
                       >
-                        {savingVoice ? 'Saving...' : 'Save'}
+                        {savingVoice ? (
+                        <span className="flex items-center">
+                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                          Saving...
+                        </span>
+                      ) : 'Save'}
                       </Button>
                       {saveSuccess && <span className="text-xs text-green-600 ml-2">Voice saved!</span>}
                       {voiceError && <span className="text-xs text-red-500 ml-2">{voiceError}</span>}
@@ -965,7 +1047,12 @@ export default function AgentDetails() {
                         onClick={handleSaveFirstMessage}
                         disabled={savingFirstMessage}
                       >
-                        {savingFirstMessage ? "Saving..." : "Save"}
+                        {savingFirstMessage ? (
+                        <span className="flex items-center">
+                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                          Saving...
+                        </span>
+                      ) : "Save"}
                       </Button>
                       {saveErrorFirstMessage && <span className="text-xs text-red-500">{saveErrorFirstMessage}</span>}
                   </div>
@@ -999,7 +1086,12 @@ export default function AgentDetails() {
                         onClick={handleSaveSystemPrompt}
                         disabled={savingPrompt}
                       >
-                        {savingPrompt ? "Saving..." : "Save"}
+                        {savingPrompt ? (
+                        <span className="flex items-center">
+                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                          Saving...
+                        </span>
+                      ) : "Save"}
                       </Button>
                       {saveErrorPrompt && <span className="text-xs text-red-500">{saveErrorPrompt}</span>}
                   </div>
@@ -1020,7 +1112,12 @@ export default function AgentDetails() {
                       onClick={handleAddDocumentClick}
                       disabled={uploading}
                     >
-                      {uploading ? "Uploading..." : "Add document"}
+                      {uploading ? (
+                        <span className="flex items-center">
+                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                          Uploading...
+                        </span>
+                      ) : "Add document"}
                     </Button>
                     <input
                       ref={fileInputRef}
@@ -1142,6 +1239,65 @@ export default function AgentDetails() {
                       onCheckedChange={setPlayKeypedTone}
                     />
                   </div>
+                  
+                  {/* Custom Tools */}
+                  <div className="pt-6 border-t border-border">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-foreground">Custom tools</h3>
+                        <p className="text-xs text-muted-foreground">Provide the agent with custom tools it can use to help users.</p>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setIsCustomToolOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add tool
+                      </Button>
+                    </div>
+                    
+                    {/* List of custom tools */}
+                    <div className="space-y-3">
+                      {customTools.length === 0 ? (
+                        <p className="text-xs text-muted-foreground italic">No custom tools added yet.</p>
+                      ) : (
+                        customTools.map((tool, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start justify-between p-3 bg-muted/50 rounded-md cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              setSelectedCustomTool(tool);
+                              setIsCustomToolOpen(true);
+                            }}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="p-2 bg-primary/10 rounded-md">
+                                <Bot className="h-4 w-4 text-primary" />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-medium">{tool.name}</h4>
+                                <p className="text-xs text-muted-foreground">{tool.description || 'No description provided'}</p>
+                              </div>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleDeleteTool(tool.name);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Delete tool</span>
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  
                   {/* Save tools button */}
                   <div className="flex items-center space-x-2 pt-2">
                     <Button
@@ -1150,7 +1306,12 @@ export default function AgentDetails() {
                       onClick={saveTools}
                       disabled={savingTools}
                     >
-                      {savingTools ? "Saving..." : "Save"}
+                      {savingTools ? (
+                        <span className="flex items-center">
+                          <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                          Saving...
+                        </span>
+                      ) : "Save"}
                     </Button>
                     {saveErrorTools && <span className="text-xs text-red-500">{saveErrorTools}</span>}
                   </div>
@@ -1161,6 +1322,18 @@ export default function AgentDetails() {
           </div>
         </div>
       </main>
+      
+      {/* Custom Tool Sidebar */}
+      <CustomToolSidebar 
+        isOpen={isCustomToolOpen} 
+        onClose={() => {
+          setIsCustomToolOpen(false);
+          setSelectedCustomTool(null);
+        }} 
+        agentId={params?.id}
+        onToolsUpdated={() => setRefreshTrigger(prev => prev + 1)}
+        toolJson={selectedCustomTool ? JSON.stringify(selectedCustomTool, null, 2) : undefined}
+      />
     </div>
   );
 }
