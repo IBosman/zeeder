@@ -5,7 +5,7 @@ import {
   voices, type Voice, type InsertVoice,
   companyVoices, type CompanyVoice, type CompanyVoiceWithDetails, type InsertCompanyVoice
 } from "@shared/schema";
-import { db } from "./db";
+import { db, withDbRetry } from "./db";
 import { eq, and, sql } from "drizzle-orm";
 
 // modify the interface with any CRUD methods
@@ -56,8 +56,11 @@ export interface IStorage {
 export class DbStorage implements IStorage {
   // Company methods
   async getCompanies(): Promise<Company[]> {
-    return db.query.companies.findMany({
-      orderBy: (companies, { desc }) => [desc(companies.createdAt)]
+    // Add retry logic for retrieving all companies
+    return withDbRetry(async () => {
+      return db.query.companies.findMany({
+        orderBy: (companies, { desc }) => [desc(companies.createdAt)]
+      });
     });
   }
 
@@ -69,9 +72,11 @@ export class DbStorage implements IStorage {
         return null;
       }
       
-      // Then get the company
-      const company = await db.query.companies.findFirst({
-        where: eq(companies.id, user.companyId)
+      // Then get the company with retry logic
+      const company = await withDbRetry(async () => {
+        return db.query.companies.findFirst({
+          where: eq(companies.id, user.companyId)
+        });
       });
       
       return company || null;
@@ -84,13 +89,19 @@ export class DbStorage implements IStorage {
   async createCompany(company: InsertCompany): Promise<Company> {
     const { name } = company;
     
-    const [result] = await db.insert(companies).values({
-      name,
-      createdAt: new Date()
+    // Insert company with retry logic
+    const [result] = await withDbRetry(async () => {
+      return db.insert(companies).values({
+        name,
+        createdAt: new Date()
+      });
     });
     
-    const created = await db.query.companies.findFirst({
-      where: eq(companies.id, result.insertId)
+    // Retrieve created company with retry logic
+    const created = await withDbRetry(async () => {
+      return db.query.companies.findFirst({
+        where: eq(companies.id, result.insertId)
+      });
     });
     
     if (!created) {
@@ -102,73 +113,96 @@ export class DbStorage implements IStorage {
 
   async deleteCompany(id: number): Promise<void> {
     try {
-      // First delete any company-voice associations
-      await db.delete(companyVoices).where(eq(companyVoices.companyId, id));
+      // First delete any company-voice associations with retry logic
+      await withDbRetry(async () => {
+        return db.delete(companyVoices).where(eq(companyVoices.companyId, id));
+      });
       
-      // Delete any agents associated with this company
-      await db.delete(agents).where(eq(agents.companyId, id));
+      // Delete any agents associated with this company with retry logic
+      await withDbRetry(async () => {
+        return db.delete(agents).where(eq(agents.companyId, id));
+      });
       
-      // Check if there are any users associated with this company
-      const usersWithCompany = await db.select().from(users).where(eq(users.companyId, id));
+      // Check if there are any users associated with this company with retry logic
+      const usersWithCompany = await withDbRetry(async () => {
+        return db.select().from(users).where(eq(users.companyId, id));
+      });
       
-      // Update users to remove the company association
-      // Based on the database state, companyId can be NULL
+      // Update users to remove the company association with retry logic
+      // Use SQL directly to set companyId to NULL to avoid TypeScript type issues
       if (usersWithCompany.length > 0) {
-        for (const user of usersWithCompany) {
-          // Use a raw SQL update to set companyId to NULL
-          // This bypasses TypeScript's type checking for this specific operation
-          await db.execute(sql`UPDATE users SET company_id = NULL WHERE id = ${user.id}`);
-        }
+        await withDbRetry(async () => {
+          return db.execute(sql`UPDATE users SET company_id = NULL WHERE company_id = ${id}`);
+        });
       }
       
-      // Finally delete the company
-      await db.delete(companies).where(eq(companies.id, id));
+      // Finally delete the company with retry logic
+      await withDbRetry(async () => {
+        return db.delete(companies).where(eq(companies.id, id));
+      });
     } catch (error) {
-      console.error('Error in deleteCompany:', error);
-      throw error;
+      console.error('Error deleting company:', error);
+      throw new Error('Failed to delete company');
     }
   }
 
   // Company Users methods
   async getUsersByCompanyId(companyId: number): Promise<User[]> {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.companyId, companyId));
-
-    return result;
+    // Add retry logic for retrieving users by company ID
+    return withDbRetry(async () => {
+      return db.select()
+        .from(users)
+        .where(eq(users.companyId, companyId));
+    });
   }
 
   async assignUserToCompany(companyId: number, userId: number): Promise<User> {
-    // Update the user's companyId
-    await db
-      .update(users)
-      .set({ companyId })
-      .where(eq(users.id, userId));
-    
-    // Return the updated user
-    const updatedUser = await this.getUser(userId);
-    if (!updatedUser) {
-      throw new Error('Failed to retrieve updated user');
+    try {
+      // Update the user's companyId with retry logic
+      await withDbRetry(async () => {
+        return db.update(users)
+          .set({ companyId })
+          .where(eq(users.id, userId));
+      });
+      
+      // Get the updated user with retry logic
+      const updatedUser = await withDbRetry(async () => {
+        return db.query.users.findFirst({ where: eq(users.id, userId) });
+      });
+      
+      if (!updatedUser) {
+        throw new Error('User not found after update');
+      }
+      
+      return updatedUser;
+    } catch (error) {
+      console.error('Error assigning user to company:', error);
+      throw new Error('Failed to assign user to company');
     }
-
-    return updatedUser;
   }
 
   async removeUserFromCompany(userId: number): Promise<boolean> {
-    // Set the user's companyId to 0 (representing no company)
-    await db
-      .update(users)
-      .set({ companyId: 0 })
-      .where(eq(users.id, userId));
-
-    // Check if the update was successful
-    const updatedUser = await this.getUser(userId);
-    if (!updatedUser) {
-      return false;
+    try {
+      // Get the user to verify it exists with retry logic
+      const user = await withDbRetry(async () => {
+        return db.query.users.findFirst({ where: eq(users.id, userId) });
+      });
+      
+      if (!user) {
+        return false;
+      }
+      
+      // Update the user to remove company association with retry logic
+      // Use SQL directly to set companyId to NULL to avoid TypeScript type issues
+      await withDbRetry(async () => {
+        return db.execute(sql`UPDATE users SET company_id = NULL WHERE id = ${userId}`);
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error removing user from company:', error);
+      throw new Error('Failed to remove user from company');
     }
-
-    return updatedUser.companyId === 0;
   }
 
   // Company Voices methods
@@ -176,11 +210,13 @@ export class DbStorage implements IStorage {
     try {
       console.log(`Fetching company voices for companyId: ${companyId}`);
       
-      // First get the company voice associations
-      const companyVoiceAssociations = await db
-        .select()
-        .from(companyVoices)
-        .where(eq(companyVoices.companyId, companyId));
+      // First get the company voice associations with retry logic
+      const companyVoiceAssociations = await withDbRetry(async () => {
+        return db
+          .select()
+          .from(companyVoices)
+          .where(eq(companyVoices.companyId, companyId));
+      });
       
       console.log(`Found ${companyVoiceAssociations.length} company voice associations`);
       
@@ -188,11 +224,14 @@ export class DbStorage implements IStorage {
       const result: CompanyVoiceWithDetails[] = [];
       
       for (const association of companyVoiceAssociations) {
-        const voiceDetails = await db
-          .select()
-          .from(voices)
-          .where(eq(voices.voiceId, association.voiceId))
-          .limit(1);
+        // Get voice details with retry logic
+        const voiceDetails = await withDbRetry(async () => {
+          return db
+            .select()
+            .from(voices)
+            .where(eq(voices.voiceId, association.voiceId))
+            .limit(1);
+        });
         
         if (voiceDetails.length > 0) {
           result.push({
@@ -219,19 +258,24 @@ export class DbStorage implements IStorage {
       voiceId
     };
 
-    await db.insert(companyVoices).values(newCompanyVoice);
+    // Insert company-voice association with retry logic
+    await withDbRetry(async () => {
+      return db.insert(companyVoices).values(newCompanyVoice);
+    });
     
-    // Return the created association
-    const [created] = await db
-      .select()
-      .from(companyVoices)
-      .where(
-        and(
-          eq(companyVoices.companyId, companyId),
-          eq(companyVoices.voiceId, voiceId)
+    // Return the created association with retry logic
+    const [created] = await withDbRetry(async () => {
+      return db
+        .select()
+        .from(companyVoices)
+        .where(
+          and(
+            eq(companyVoices.companyId, companyId),
+            eq(companyVoices.voiceId, voiceId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
+    });
 
     if (!created) {
       throw new Error('Failed to retrieve created company-voice association');
@@ -241,63 +285,70 @@ export class DbStorage implements IStorage {
   }
 
   async removeVoiceFromCompany(companyId: number, voiceId: string): Promise<boolean> {
-    const result = await db
-      .delete(companyVoices)
-      .where(
-        and(
-          eq(companyVoices.companyId, companyId),
-          eq(companyVoices.voiceId, voiceId)
-        )
-      );
+    // Delete company-voice association with retry logic
+    await withDbRetry(async () => {
+      return db
+        .delete(companyVoices)
+        .where(
+          and(
+            eq(companyVoices.companyId, companyId),
+            eq(companyVoices.voiceId, voiceId)
+          )
+        );
+    });
 
-    // Check if any rows were affected
-    const deleted = await db
-      .select()
-      .from(companyVoices)
-      .where(
-        and(
-          eq(companyVoices.companyId, companyId),
-          eq(companyVoices.voiceId, voiceId)
+    // Check if any rows were affected with retry logic
+    const deleted = await withDbRetry(async () => {
+      return db
+        .select()
+        .from(companyVoices)
+        .where(
+          and(
+            eq(companyVoices.companyId, companyId),
+            eq(companyVoices.voiceId, voiceId)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
+    });
 
     return deleted.length === 0;
   }
 
   // Voice methods
   async getVoices(): Promise<Voice[]> {
-    return db.select({
-      voiceId: voices.voiceId,
-      name: voices.name,
-      category: voices.category,
-      createdAt: voices.createdAt
-    }).from(voices).orderBy(voices.voiceId);
+    // Add retry logic for retrieving all voices
+    return withDbRetry(async () => {
+      return db.query.voices.findMany();
+    });
   }
 
   async getVoiceById(id: string): Promise<Voice | null> {
-    const result = await db.select({
-      voiceId: voices.voiceId,
-      name: voices.name,
-      category: voices.category,
-      createdAt: voices.createdAt
-    })
-      .from(voices)
-      .where(eq(voices.voiceId, id))
-      .limit(1);
-    return result[0] || null;
+    // Add retry logic for retrieving voice by ID
+    const voice = await withDbRetry(async () => {
+      return db.query.voices.findFirst({
+        where: eq(voices.voiceId, id)
+      });
+    });
+    return voice || null;
   }
 
   async createVoice(voice: InsertVoice): Promise<Voice> {
-    await db.insert(voices).values(voice);
-    const [created] = await db.select({
-      voiceId: voices.voiceId,
-      name: voices.name,
-      category: voices.category,
-      createdAt: voices.createdAt
-    })
-      .from(voices)
-      .where(eq(voices.voiceId, voice.voiceId));
+    // Add retry logic for voice creation
+    await withDbRetry(async () => {
+      return db.insert(voices).values(voice);
+    });
+    
+    // Add retry logic for retrieving created voice
+    const [created] = await withDbRetry(async () => {
+      return db.select({
+        voiceId: voices.voiceId,
+        name: voices.name,
+        category: voices.category,
+        createdAt: voices.createdAt
+      })
+        .from(voices)
+        .where(eq(voices.voiceId, voice.voiceId));
+    });
     
     if (!created) {
       throw new Error('Failed to retrieve created voice');
@@ -307,18 +358,24 @@ export class DbStorage implements IStorage {
   }
 
   async updateVoice(voiceId: string, updates: Partial<Omit<InsertVoice, 'voiceId'>>): Promise<Voice> {
-    await db.update(voices)
-      .set(updates)
-      .where(eq(voices.voiceId, voiceId));
+    // Add retry logic for voice update
+    await withDbRetry(async () => {
+      return db.update(voices)
+        .set(updates)
+        .where(eq(voices.voiceId, voiceId));
+    });
     
-    const [updated] = await db.select({
-      voiceId: voices.voiceId,
-      name: voices.name,
-      category: voices.category,
-      createdAt: voices.createdAt
-    })
-      .from(voices)
-      .where(eq(voices.voiceId, voiceId));
+    // Add retry logic for retrieving updated voice
+    const [updated] = await withDbRetry(async () => {
+      return db.select({
+        voiceId: voices.voiceId,
+        name: voices.name,
+        category: voices.category,
+        createdAt: voices.createdAt
+      })
+        .from(voices)
+        .where(eq(voices.voiceId, voiceId));
+    });
       
     if (!updated) {
       throw new Error(`Voice with ID ${voiceId} not found`);
@@ -328,35 +385,51 @@ export class DbStorage implements IStorage {
   }
 
   async deleteVoice(voiceId: string): Promise<void> {
-    await db.delete(voices).where(eq(voices.voiceId, voiceId));
+    // Add retry logic for voice deletion
+    await withDbRetry(async () => {
+      return db.delete(voices).where(eq(voices.voiceId, voiceId));
+    });
   }
 
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return db.query.users.findFirst({ where: eq(users.id, id) });
+    // Add retry logic for user retrieval
+    return withDbRetry(async () => {
+      return db.query.users.findFirst({ where: eq(users.id, id) });
+    });
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return db.query.users.findFirst({ where: eq(users.username, username) });
+    // Add retry logic to this critical authentication function
+    return withDbRetry(async () => {
+      return db.query.users.findFirst({ where: eq(users.username, username) });
+    });
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return db.query.users.findFirst({ where: eq(users.email, email) });
+    // Add retry logic for email-based user lookup
+    return withDbRetry(async () => {
+      return db.query.users.findFirst({ where: eq(users.email, email) });
+    });
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     try {
-      // Insert the user and get the inserted ID
-      const [result] = await db.insert(users).values({
-        ...insertUser,
-        // Ensure required fields are set
-        role: insertUser.role || 'user',
-        createdAt: new Date(),
+      // Insert the user and get the inserted ID with retry logic
+      const [result] = await withDbRetry(async () => {
+        return db.insert(users).values({
+          ...insertUser,
+          // Ensure required fields are set
+          role: insertUser.role || 'user',
+          createdAt: new Date(),
+        });
       });
       
-      // Fetch the inserted user
-      const user = await db.query.users.findFirst({ 
-        where: eq(users.username, insertUser.username) 
+      // Fetch the inserted user with retry logic
+      const user = await withDbRetry(async () => {
+        return db.query.users.findFirst({ 
+          where: eq(users.username, insertUser.username) 
+        });
       });
       
       if (!user) {
@@ -372,15 +445,19 @@ export class DbStorage implements IStorage {
 
   async createAgent(insertAgent: InsertAgent): Promise<Agent> {
     try {
-      // Insert the agent
-      await db.insert(agents).values({
-        ...insertAgent,
-        createdAt: new Date(),
+      // Insert the agent with retry logic
+      await withDbRetry(async () => {
+        return db.insert(agents).values({
+          ...insertAgent,
+          createdAt: new Date(),
+        });
       });
       
-      // Get the inserted agent by elevenlabsAgentId since it's unique
-      const agent = await db.query.agents.findFirst({ 
-        where: eq(agents.elevenlabsAgentId, insertAgent.elevenlabsAgentId) 
+      // Get the inserted agent by elevenlabsAgentId since it's unique with retry logic
+      const agent = await withDbRetry(async () => {
+        return db.query.agents.findFirst({ 
+          where: eq(agents.elevenlabsAgentId, insertAgent.elevenlabsAgentId) 
+        });
       });
       
       if (!agent) {
@@ -395,30 +472,43 @@ export class DbStorage implements IStorage {
   }
 
   async getAgents(): Promise<Agent[]> {
-    return db.query.agents.findMany();
+    // Add retry logic for retrieving all agents
+    return withDbRetry(async () => {
+      return db.query.agents.findMany();
+    });
   }
 
   async getAgentsByCompanyId(companyId: number): Promise<Agent[]> {
-    return db.query.agents.findMany({ where: eq(agents.companyId, companyId) });
+    // Add retry logic for retrieving agents by company ID
+    return withDbRetry(async () => {
+      return db.query.agents.findMany({ where: eq(agents.companyId, companyId) });
+    });
   }
 
   async getAgentById(agentId: number): Promise<Agent | undefined> {
-    return db.query.agents.findFirst({ where: eq(agents.id, agentId) });
+    // Add retry logic for retrieving agent by ID
+    return withDbRetry(async () => {
+      return db.query.agents.findFirst({ where: eq(agents.id, agentId) });
+    });
   }
 
   async updateAgent(agentId: number, update: Partial<Agent>): Promise<Agent | undefined> {
     try {
-      // Update the agent
-      await db.update(agents)
-        .set({
-          ...update,
-          updatedAt: new Date(),
-        })
-        .where(eq(agents.id, agentId));
+      // Update the agent with retry logic
+      await withDbRetry(async () => {
+        return db.update(agents)
+          .set({
+            ...update,
+            updatedAt: new Date(),
+          })
+          .where(eq(agents.id, agentId));
+      });
       
-      // Fetch the updated agent
-      const updatedAgent = await db.query.agents.findFirst({ 
-        where: eq(agents.id, agentId) 
+      // Fetch the updated agent with retry logic
+      const updatedAgent = await withDbRetry(async () => {
+        return db.query.agents.findFirst({ 
+          where: eq(agents.id, agentId) 
+        });
       });
       
       if (!updatedAgent) {
@@ -433,22 +523,29 @@ export class DbStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return db.query.users.findMany();
+    // Add retry logic for retrieving all users
+    return withDbRetry(async () => {
+      return db.query.users.findMany();
+    });
   }
 
   async updateUser(userId: number, update: Partial<User>): Promise<User | undefined> {
     try {
-      // Update the user
-      await db.update(users)
-        .set({
-          ...update,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userId));
+      // Update the user with retry logic
+      await withDbRetry(async () => {
+        return db.update(users)
+          .set({
+            ...update,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
+      });
       
-      // Fetch the updated user
-      const updatedUser = await db.query.users.findFirst({ 
-        where: eq(users.id, userId) 
+      // Fetch the updated user with retry logic
+      const updatedUser = await withDbRetry(async () => {
+        return db.query.users.findFirst({ 
+          where: eq(users.id, userId) 
+        });
       });
       
       if (!updatedUser) {
@@ -463,22 +560,33 @@ export class DbStorage implements IStorage {
   }
 
   async getAgentByElevenlabsId(elevenlabsAgentId: string): Promise<Agent | undefined> {
-    return db.query.agents.findFirst({ where: eq(agents.elevenlabsAgentId, elevenlabsAgentId) });
+    // Add retry logic for agent lookup by ElevenLabs ID
+    return withDbRetry(async () => {
+      return db.query.agents.findFirst({ where: eq(agents.elevenlabsAgentId, elevenlabsAgentId) });
+    });
   }
 
   async deleteUser(userId: number): Promise<boolean> {
     try {
-      // Check if user exists
-      const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      // Check if user exists with retry logic
+      const user = await withDbRetry(async () => {
+        return db.query.users.findFirst({ where: eq(users.id, userId) });
+      });
+      
       if (!user) {
         return false;
       }
       
-      // Delete the user
-      await db.delete(users).where(eq(users.id, userId));
+      // Delete the user with retry logic
+      await withDbRetry(async () => {
+        return db.delete(users).where(eq(users.id, userId));
+      });
       
-      // Verify deletion
-      const deletedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      // Verify deletion with retry logic
+      const deletedUser = await withDbRetry(async () => {
+        return db.query.users.findFirst({ where: eq(users.id, userId) });
+      });
+      
       return !deletedUser;
     } catch (error) {
       console.error('Error deleting user:', error);
