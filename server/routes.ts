@@ -797,16 +797,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           };
           
-          // Convert properties array to object format as required by ElevenLabs
+          // Handle properties based on format (array or object)
           if (Array.isArray(tool.api_schema?.request_body_schema?.properties)) {
+            // Convert properties array to object format as required by ElevenLabs
             tool.api_schema.request_body_schema.properties.forEach((prop: any) => {
               if (prop.id) {
                 // Add each property to the properties object with the correct format
                 processedTool.api_schema.request_body_schema.properties[prop.id] = {
                   type: prop.type || 'string',
                   description: prop.description || '',
-                  dynamic_variable: '',
-                  constant_value: ''
+                  dynamic_variable: prop.dynamic_variable || '',
+                  constant_value: prop.constant_value || ''
                 };
                 
                 // If property is required, add it to the required array
@@ -815,6 +816,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 }
               }
             });
+          } else if (typeof tool.api_schema?.request_body_schema?.properties === 'object') {
+            // If properties is already an object, preserve it
+            processedTool.api_schema.request_body_schema.properties = { ...tool.api_schema.request_body_schema.properties };
+            
+            // Also preserve the required array if it exists
+            if (Array.isArray(tool.api_schema.request_body_schema.required)) {
+              processedTool.api_schema.request_body_schema.required = [...tool.api_schema.request_body_schema.required];
+            }
           }
           
           return processedTool;

@@ -7,26 +7,35 @@ import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useState } from "react";
 
+interface Tool {
+  name: string;
+  [key: string]: any;
+}
+
 interface CustomToolSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   agentId?: string;
   onToolsUpdated?: () => void;
   toolJson?: string;
+  originalToolName?: string;
 }
 
-export function CustomToolSidebar({ isOpen, onClose, agentId, onToolsUpdated, toolJson }: CustomToolSidebarProps) {
+export function CustomToolSidebar({ isOpen, onClose, agentId, onToolsUpdated, toolJson, originalToolName }: CustomToolSidebarProps) {
   const [jsonInput, setJsonInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [originalName, setOriginalName] = useState<string | undefined>(undefined);
 
   // Load toolJson when opening for edit
   React.useEffect(() => {
     if (isOpen && toolJson !== undefined) {
       setJsonInput(toolJson);
+      setOriginalName(originalToolName);
     } else if (isOpen && !toolJson) {
       setJsonInput("");
+      setOriginalName(undefined);
     }
-  }, [isOpen, toolJson]);
+  }, [isOpen, toolJson, originalToolName]);
 
   if (!isOpen) return null;
 
@@ -75,7 +84,10 @@ export function CustomToolSidebar({ isOpen, onClose, agentId, onToolsUpdated, to
       console.log("Existing tools:", existingTools);
       
       // Add the new tool to the existing tools
-      const updatedTools = [...existingTools, toolData];
+      const updatedTools = [
+        ...existingTools.filter((t: Tool) => t.name !== (originalName ?? toolData.name)),
+        toolData
+      ];
       console.log("Updated tools to save:", updatedTools);
       
       // Save the updated tools

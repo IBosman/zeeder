@@ -1333,6 +1333,7 @@ export default function AgentDetails() {
         agentId={params?.id}
         onToolsUpdated={() => setRefreshTrigger(prev => prev + 1)}
         toolJson={selectedCustomTool ? JSON.stringify(selectedCustomTool, null, 2) : undefined}
+        originalToolName={selectedCustomTool?.name}
       />
     </div>
   );
